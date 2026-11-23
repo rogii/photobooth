@@ -125,6 +125,7 @@ class PhotoboothService:
                 "name": metadata.get("name") or folder.name,
                 "created_at": metadata.get("created_at", ""),
                 "photo_dir": metadata.get("photo_dir", ""),
+                "overlay": metadata.get("overlay", ""),
                 "sort_time": sort_time,
                 "locked": bool(self.locked_session and self.locked_session.get("id") == folder.name),
                 "hidden": bool(metadata.get("hidden", False)),
@@ -159,7 +160,73 @@ class PhotoboothService:
 
     @staticmethod
     def session_from_item(item):
-        return {key: item[key] for key in ("id", "name", "created_at", "hidden", "photo_dir") if key in item}
+        return {key: item[key] for key in ("id", "name", "created_at", "hidden", "photo_dir", "overlay") if key in item}
+
+    def session_overlay_path(self, session):
+        filename = session.get("overlay")
+        if filename not in ("overlay.png", "overlay.webp"):
+            return None
+        return SESSIONS / session["id"] / filename
+
+    def set_session_overlay(self, session_id, upload=None, remove=False):
+        with self.state_lock:
+            if self.busy:
+                raise RuntimeError("Wait for the current capture to finish")
+            folder = SESSIONS / session_id
+            if folder.name != session_id or folder.is_symlink() or not folder.is_dir():
+                raise ValueError("Session not found")
+            item = next((item for item in self.list_sessions(include_hidden=True) if item["id"] == session_id), None)
+            if not item:
+                raise ValueError("Session not found")
+            session = self.session_from_item(item)
+            if remove:
+                for name in ("overlay.png", "overlay.webp"):
+                    (folder / name).unlink(missing_ok=True)
+                session.pop("overlay", None)
+            else:
+                if not upload or not upload.filename:
+                    raise ValueError("Choose a PNG or WebP overlay image")
+                suffix = Path(upload.filename).suffix.lower()
+                if suffix not in (".png", ".webp"):
+                    raise ValueError("Overlay must be a PNG or WebP image")
+                filename = "overlay.png" if suffix == ".png" else "overlay.webp"
+                temporary = folder / f".{filename}.tmp"
+                try:
+                    with Image.open(upload.stream) as source:
+                        if source.width > 8000 or source.height > 8000:
+                            raise ValueError("Overlay dimensions must be 8000 pixels or smaller")
+                        image = ImageOps.exif_transpose(source).convert("RGBA")
+                        image.save(temporary, format="PNG" if suffix == ".png" else "WEBP", lossless=True)
+                except (OSError, Image.DecompressionBombError) as exc:
+                    temporary.unlink(missing_ok=True)
+                    raise ValueError("Could not read overlay image") from exc
+                for name in ("overlay.png", "overlay.webp"):
+                    (folder / name).unlink(missing_ok=True)
+                temporary.replace(folder / filename)
+                session["overlay"] = filename
+            (folder / "session.json").write_text(json.dumps(session, ensure_ascii=False, indent=2))
+            if self.session and self.session.get("id") == session_id:
+                self.session = session
+                self.last_session = dict(session)
+                LAST_SESSION.write_text(json.dumps(session, ensure_ascii=False, indent=2))
+            self.gallery_revision += 1
+            return session
+
+    def make_overlaid_photo(self, photo, session):
+        overlay_path = self.session_overlay_path(session)
+        if not overlay_path or not overlay_path.is_file():
+            return photo
+        output_dir = photo.parent / "overlays"
+        output_dir.mkdir(parents=True, exist_ok=True)
+        output = output_dir / photo.name
+        with Image.open(photo) as source, Image.open(overlay_path) as overlay_source:
+            base = ImageOps.exif_transpose(source).convert("RGBA")
+            overlay = ImageOps.exif_transpose(overlay_source).convert("RGBA")
+            if overlay.size != base.size:
+                overlay = ImageOps.fit(overlay, base.size, method=Image.Resampling.LANCZOS)
+            base.alpha_composite(overlay)
+            base.convert("RGB").save(output, format="JPEG", quality=92, optimize=True)
+        return output
 
     def session_photo_dir(self, session):
         directory = session.get("photo_dir", "")
@@ -366,7 +433,13 @@ class PhotoboothService:
         files = sorted(folder.glob("*.jpg"), key=lambda path: path.name, reverse=True)
         columns = max(1, min(12, int(self.config.get("idle_gallery_columns", 3))))
         files = files[:columns * max(1, min(12, int(rows)))]
-        return [{"name": path.name, "url": f"/api/photos/{folder.name}/{path.name}"} for path in files]
+        overlay = self.session_overlay_path(event)
+        result = []
+        for path in files:
+            display = self.make_overlaid_photo(path, event) if overlay and overlay.is_file() else path
+            relative = display.relative_to(folder).as_posix()
+            result.append({"name": path.name, "url": f"/api/photos/{folder.name}/{relative}"})
+        return result
 
     @staticmethod
     def safe_event_name(name):
@@ -608,8 +681,9 @@ class PhotoboothService:
                 result = stored
             with self.state_lock:
                 self.gallery_revision += 1
-            self.make_display_image(result)
             session = self.session
+            display_result = self.make_overlaid_photo(result, session)
+            self.make_display_image(display_result)
             queued = UPLOAD_QUEUE / f"{session['id']}-{result.name}.json"
             queued.write_text(json.dumps({
                 "file": str(result),
@@ -767,7 +841,7 @@ def create_app(service, admin_port=ADMIN_PORT):
 
     @web.before_request
     def admin_routes():
-        regular_admin = {"admin", "save_config", "admin_event", "admin_session_lock", "admin_session_stop", "admin_session_hidden", "admin_session_delete", "admin_session_download", "admin_capture", "restart_app", "get_admin_state"}
+        regular_admin = {"admin", "save_config", "admin_event", "admin_session_lock", "admin_session_stop", "admin_session_hidden", "admin_session_delete", "admin_session_download", "admin_session_overlay", "admin_capture", "restart_app", "get_admin_state"}
         local_admin = {"local_admin_page", "local_admin_photos", "local_admin_photo", "local_admin_delete_photos", "local_admin_shutdown", "local_admin_change_pin"}
         if request.endpoint in regular_admin and int(request.environ.get("SERVER_PORT", 0)) != admin_port:
             return jsonify({"error": f"Open the admin interface on port {admin_port}"}), 404
@@ -897,6 +971,15 @@ def create_app(service, admin_port=ADMIN_PORT):
         except (ValueError, RuntimeError) as exc:
             return jsonify({"error": str(exc)}), 400
 
+    @web.post("/api/admin/session-overlay/<session_id>")
+    def admin_session_overlay(session_id):
+        try:
+            remove = request.form.get("remove") == "1"
+            overlay = service.set_session_overlay(session_id, request.files.get("overlay"), remove=remove)
+            return jsonify({"session": overlay})
+        except (ValueError, RuntimeError, OSError) as exc:
+            return jsonify({"error": str(exc)}), 400
+
     @web.get("/api/admin/session-download/<session_id>")
     def admin_session_download(session_id):
         try:
@@ -921,7 +1004,7 @@ def create_app(service, admin_port=ADMIN_PORT):
         except (ValueError, RuntimeError) as exc:
             return jsonify({"error": str(exc)}), 400
 
-    @web.get("/api/photos/<event>/<filename>")
+    @web.get("/api/photos/<event>/<path:filename>")
     def photo_file(event, filename):
         return send_from_directory(DATA / event, filename)
 
