@@ -70,7 +70,7 @@ gallery/
 
 The server creates a new TV appearance identifier when the slideshow advances automatically to a photo. The TV can submit at most one vote for that photo during that appearance. When the slideshow later returns to the same photo automatically, it receives a new appearance identifier and can be upvoted again.
 
-Manual previous/next controls must not create a new vote opportunity. The server should mark manually selected slides as ineligible for TV votes, or preserve the current appearance identifier without issuing a new one. This prevents repeatedly stepping around the slideshow to vote for the same photo again. The TV UI should show when a vote was accepted and when the current slide cannot be voted on.
+Manual previous/next controls must not create a new vote opportunity. When manual navigation begins, the TV should invalidate its current appearance identifier; manually selected slides have no vote eligibility. When automatic playback resumes, a new appearance identifier is issued only as playback advances automatically, not just because automatic mode was resumed. This prevents repeatedly stepping around the slideshow to vote for the same photo again. The TV UI should show when a vote was accepted and when the current slide cannot be voted on.
 
 ### TV setup and pairing
 
