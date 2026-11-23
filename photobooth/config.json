@@ -4,6 +4,7 @@
   "upload_token": "",
   "gpio_flash_pin": 17,
   "countdown_seconds": 3,
+  "capture_lead_seconds": 1.2,
   "sequence_interval_seconds": 0.8,
   "flash_seconds": 0.18,
   "key_single": "a",

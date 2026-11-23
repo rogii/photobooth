@@ -9,6 +9,7 @@ let galleryPhotos = [];
 let galleryRequest = false;
 let galleryLayout = "";
 let pickerOpen = false;
+let capsLock = false;
 
 async function api(path, body) {
   const response = await fetch(path, {
@@ -25,7 +26,7 @@ async function api(path, body) {
 function render(current) {
   state = current;
   $("#event").textContent = current.session?.name || "";
-  $("#event-footer").classList.toggle("hidden", !current.session);
+  $("#event-footer").classList.toggle("hidden", !current.session || current.phase === "result");
   $("#capture-count").textContent = Number(current.capture_count || 0).toLocaleString();
   const queuedUploads = Number(current.queued_uploads || 0);
   $("#upload-indicator").classList.toggle("pending", queuedUploads > 0);
@@ -38,7 +39,7 @@ function render(current) {
   const overlay = $("#overlay");
   renderGallery();
 
-  const activePhases = ["countdown", "capturing", "downloading", "result"];
+  const activePhases = ["countdown", "capturing", "result"];
   $("#empty").classList.toggle("hidden", !!current.session);
   gallery.classList.toggle("hidden", !current.session || current.phase !== "idle");
   overlay.classList.toggle("hidden", !activePhases.includes(current.phase));
@@ -46,22 +47,14 @@ function render(current) {
   $("#photo-position").textContent = current.photo_total > 1
     ? `PHOTO ${current.photo_number} / ${current.photo_total}`
     : "";
-  $("#countdown").classList.toggle("hidden", current.phase !== "countdown");
-  $("#countdown").textContent = current.phase === "countdown" ? current.countdown : "";
-  $("#capture-status").classList.toggle("hidden", current.phase !== "capturing");
-  $("#capture-status").textContent = current.phase === "capturing"
-    ? (current.photo_total > 1 ? `CAPTURING ${current.photo_number} / ${current.photo_total}` : "CAPTURING PHOTO")
-    : "";
-  $("#progress").classList.toggle("hidden", current.phase !== "downloading");
+  const showingCapture = current.phase === "capturing";
+  $("#countdown").classList.toggle("hidden", !(current.phase === "countdown" || showingCapture) || !current.countdown);
+  $("#countdown").textContent = current.phase === "countdown" || showingCapture ? current.countdown : "";
+  $("#capture-detail").classList.toggle("hidden", !showingCapture);
+  $("#capture-detail").textContent = current.photo_total > 1
+    ? `Photo ${current.photo_number} of ${current.photo_total} is being captured and downloaded from the camera.`
+    : "Your photo is being captured and downloaded from the camera.";
   $("#result").classList.toggle("hidden", current.phase !== "result");
-  if (current.phase === "downloading") {
-    const progress = current.download_progress || 0;
-    $("#bar-fill").style.width = `${progress}%`;
-    $("#percent").textContent = `${progress}%`;
-    $("#progress-title").textContent = current.photo_total > 1
-      ? `Downloading photo ${current.photo_number} / ${current.photo_total}`
-      : "Capture download progress";
-  }
   if (current.phase === "result" && current.recent_photo_version !== lastVersion) {
     lastVersion = current.recent_photo_version;
     $("#result").src = `/api/recent-photo?v=${encodeURIComponent(lastVersion)}`;
@@ -76,7 +69,8 @@ function showSessionPicker(sessions) {
   if (!pickerOpen) {
     pickerOpen = true;
     dialog.classList.remove("hidden");
-    $("#session-input").focus();
+    $("#picker-options").classList.remove("hidden");
+    $("#new-session-form").classList.add("hidden");
   }
   const list = $("#session-list");
   const signature = sessions.map((item) => `${item.id}:${item.name}`).join("|");
@@ -112,20 +106,48 @@ function closeSessionPicker() {
   $("#session-dialog").classList.add("hidden");
 }
 
+function openNewSessionForm() {
+  $("#picker-options").classList.add("hidden");
+  $("#new-session-form").classList.remove("hidden");
+  $("#picker-error").textContent = "";
+  $("#session-input").focus();
+}
+
+function returnToSessionOptions() {
+  $("#new-session-form").classList.add("hidden");
+  $("#picker-options").classList.remove("hidden");
+  $("#picker-error").textContent = "";
+}
+
 function renderKeyboard() {
   const keyboard = $("#onscreen-keyboard");
+  keyboard.replaceChildren();
   ["1234567890", "qwertyuiop", "asdfghjklå", "zxcvbnmäö.-"].forEach((chars) => {
     const row = document.createElement("div"); row.className = "keyboard-row";
-    [...chars].forEach((char) => {
+    [...chars].forEach((lowerChar) => {
+      const char = capsLock ? lowerChar.toLocaleUpperCase("sv-SE") : lowerChar;
       const key = document.createElement("button"); key.type = "button"; key.className = "key-button"; key.textContent = char;
-      key.addEventListener("click", () => { $("#session-input").value += char; syncPickerName(); }); row.append(key);
+      key.addEventListener("click", () => insertPickerText(char)); row.append(key);
     }); keyboard.append(row);
   });
   const row = document.createElement("div"); row.className = "keyboard-row";
-  [["⌫", () => { $("#session-input").value = $("#session-input").value.slice(0, -1); }], ["Space", () => { $("#session-input").value += " "; }], ["Clear", () => { $("#session-input").value = ""; }]].forEach(([label, action]) => {
-    const key = document.createElement("button"); key.type = "button"; key.className = "key-button wide"; key.textContent = label;
+  const caps = document.createElement("button");
+  caps.type = "button"; caps.className = `key-button wide${capsLock ? " selected" : ""}`; caps.textContent = "⇧ Caps"; caps.setAttribute("aria-pressed", String(capsLock));
+  caps.addEventListener("click", () => { capsLock = !capsLock; renderKeyboard(); });
+  row.append(caps);
+  [["⌫", "wide", () => { const input = $("#session-input"); input.value = input.value.slice(0, -1); syncPickerName(); }], ["Space", "space", () => insertPickerText(" ")], ["Clear", "wide", () => { $("#session-input").value = ""; syncPickerName(); }]].forEach(([label, size, action]) => {
+    const key = document.createElement("button"); key.type = "button"; key.className = `key-button ${size}`; key.textContent = label;
     key.addEventListener("click", () => { action(); syncPickerName(); }); row.append(key);
   }); keyboard.append(row);
+}
+
+function insertPickerText(text) {
+  const input = $("#session-input");
+  const start = input.selectionStart ?? input.value.length;
+  const end = input.selectionEnd ?? input.value.length;
+  input.setRangeText(text, start, end, "end");
+  syncPickerName();
+  input.focus();
 }
 
 function syncPickerName() { $("#create-session").disabled = !$("#session-input").value.trim(); }
@@ -223,6 +245,8 @@ document.addEventListener("keydown", (event) => {
 refresh();
 renderKeyboard();
 $("#session-input").addEventListener("input", syncPickerName);
+$("#start-new-session").addEventListener("click", openNewSessionForm);
+$("#back-to-sessions").addEventListener("click", returnToSessionOptions);
 $("#create-session").addEventListener("click", createSession);
 setInterval(refresh, 250);
 window.addEventListener("resize", () => {

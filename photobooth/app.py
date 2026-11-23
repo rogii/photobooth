@@ -44,6 +44,7 @@ def read_config():
 class PhotoboothService:
     def __init__(self, demo=False):
         self.config = read_config()
+        self.config.setdefault("capture_lead_seconds", 1.2)
         self.demo = demo
         self.camera_lock = threading.Lock()
         self.state_lock = threading.Lock()
@@ -64,7 +65,6 @@ class PhotoboothService:
         self.recent_photo_version = ""
         self.recent_photo_time = None
         self.phase = "idle"
-        self.download_progress = 0
         self.photo_number = 0
         self.photo_total = 0
         self.gallery_revision = 0
@@ -270,7 +270,6 @@ class PhotoboothService:
                 "flash_available": self.flash_available,
                 "demo": self.demo,
                 "phase": self.phase,
-                "download_progress": self.download_progress,
                 "photo_number": self.photo_number,
                 "photo_total": self.photo_total,
                 "gallery_version": f"{session['id'] if session else 'none'}:{self.gallery_revision}",
@@ -300,7 +299,7 @@ class PhotoboothService:
             if self.busy:
                 raise RuntimeError("Wait for the current capture to finish before changing settings")
         previous_gpio_pin = self.config.get("gpio_flash_pin", 17)
-        allowed = {"countdown_seconds": (0, 30, int), "sequence_countdown_seconds": (0, 30, int), "sequence_interval_seconds": (0, 10, float), "idle_gallery_columns": (1, 12, int), "result_timeout_seconds": (1, 300, int), "gpio_flash_pin": (0, 27, int), "flash_seconds": (0, 5, float)}
+        allowed = {"countdown_seconds": (0, 30, int), "sequence_countdown_seconds": (0, 30, int), "capture_lead_seconds": (0, 5, float), "sequence_interval_seconds": (0, 10, float), "idle_gallery_columns": (1, 12, int), "result_timeout_seconds": (1, 300, int), "gpio_flash_pin": (0, 27, int), "flash_seconds": (0, 5, float)}
         for key, (low, high, cast) in allowed.items():
             if key in values:
                 self.config[key] = max(low, min(high, cast(values[key])))
@@ -451,33 +450,67 @@ class PhotoboothService:
                     self.photo_number = index + 1
                     self.photo_total = count
                     self.phase = "countdown"
+                capture_result = {}
+                capture_thread = None
+
+                def start_camera_capture():
+                    nonlocal capture_thread
+                    if capture_thread is not None:
+                        return
+
+                    def capture_in_background():
+                        try:
+                            if self.flash:
+                                self.flash.on()
+                                time.sleep(float(self.config.get("flash_seconds", 0.18)))
+                            capture_result["photo"] = self.capture_one(gallery_visible=(count == 1))
+                        except Exception as exc:
+                            capture_result["error"] = exc
+                        finally:
+                            if self.flash:
+                                self.flash.off()
+
+                    capture_thread = threading.Thread(
+                        target=capture_in_background,
+                        daemon=True,
+                        name="camera-trigger",
+                    )
+                    capture_thread.start()
+
+                capture_lead = max(0.0, min(5.0, float(self.config.get("capture_lead_seconds", 1.2))))
                 if photo_delay > 0:
+                    countdown_start = time.monotonic()
+                    zero_at = countdown_start + photo_delay + 0.65
+                    trigger_at = zero_at - capture_lead
                     for remaining in range(photo_delay, 0, -1):
                         self.set_countdown(str(remaining))
-                        time.sleep(1)
+                        tick_at = countdown_start + (photo_delay - remaining + 1)
+                        while time.monotonic() < tick_at:
+                            now = time.monotonic()
+                            if capture_thread is None and now >= trigger_at:
+                                start_camera_capture()
+                            time.sleep(min(0.025, max(0.001, tick_at - now)))
                     self.set_countdown("SMILE")
                     self.set_status("Smile!")
-                    time.sleep(0.65)
-                self.set_countdown("")
+                    while time.monotonic() < zero_at:
+                        now = time.monotonic()
+                        if capture_thread is None and now >= trigger_at:
+                            start_camera_capture()
+                        time.sleep(min(0.025, max(0.001, zero_at - now)))
+                else:
+                    self.set_countdown("")
+                    start_camera_capture()
+
+                if capture_thread is None:
+                    start_camera_capture()
                 with self.state_lock:
                     self.phase = "capturing"
                     self.status = f"Capturing photo {index + 1} of {count}"
-                if self.flash:
-                    self.flash.on()
-                    time.sleep(float(self.config.get("flash_seconds", 0.18)))
-                photo = self.capture_one(gallery_visible=(count == 1))
-                if self.flash:
-                    self.flash.off()
+                capture_thread.join()
+                if "error" in capture_result:
+                    raise capture_result["error"]
+                photo = capture_result["photo"]
                 files.append(photo)
-                # gPhoto2's capture-image-and-download command has completed for this frame.
-                with self.state_lock:
-                    self.phase = "downloading"
-                    self.photo_number = index + 1
-                    self.download_progress = 0
-                for progress in (12, 27, 43, 58, 74, 89, 100):
-                    with self.state_lock:
-                        self.download_progress = progress
-                    time.sleep(0.18)
                 if index + 1 < count:
                     time.sleep(interval)
             result = self.make_result(files)
@@ -521,7 +554,6 @@ class PhotoboothService:
             with self.state_lock:
                 if generation == self.capture_generation and not self.busy:
                     self.phase = "idle"
-                    self.download_progress = 0
                     self.photo_number = 0
                     self.photo_total = 0
 
@@ -666,7 +698,7 @@ def create_app(service, admin_port=ADMIN_PORT):
     def get_admin_state():
         result = service.state()
         result["sessions"] = service.list_sessions(include_hidden=True)
-        result["config"] = {key: service.config.get(key, "") for key in ("countdown_seconds", "sequence_countdown_seconds", "sequence_interval_seconds", "idle_gallery_columns", "result_timeout_seconds", "camera_command", "upload_url", "gpio_flash_pin", "flash_seconds", "key_single", "key_sequence")}
+        result["config"] = {key: service.config.get(key, "") for key in ("countdown_seconds", "sequence_countdown_seconds", "capture_lead_seconds", "sequence_interval_seconds", "idle_gallery_columns", "result_timeout_seconds", "camera_command", "upload_url", "gpio_flash_pin", "flash_seconds", "key_single", "key_sequence")}
         return jsonify(result)
 
     @web.post("/api/admin/event")
@@ -758,7 +790,7 @@ def create_app(service, admin_port=ADMIN_PORT):
     @web.get("/api/state")
     def get_state():
         state = service.state()
-        public = {key: state[key] for key in ("session", "busy", "status", "countdown", "download_progress", "photo_number", "photo_total", "recent_photo", "recent_photo_version", "phase", "gallery_version", "gallery_columns", "capture_count", "queued_uploads", "sessions", "locked_session", "host_info")}
+        public = {key: state[key] for key in ("session", "busy", "status", "countdown", "photo_number", "photo_total", "recent_photo", "recent_photo_version", "phase", "gallery_version", "gallery_columns", "capture_count", "queued_uploads", "sessions", "locked_session", "host_info")}
         public["server_instance_id"] = SERVER_INSTANCE_ID
         public["keys"] = {"single": service.config.get("key_single", "a"), "sequence": service.config.get("key_sequence", "b")}
         return jsonify(public)
