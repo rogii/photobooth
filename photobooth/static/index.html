@@ -1,3 +1,80 @@
 <!doctype html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#080b0d"><title>Photobooth</title><link rel="stylesheet" href="/static/kiosk.css"></head>
-<body><main id="screen" class="idle"><div id="gallery" class="gallery"></div><section id="overlay" class="overlay hidden"><div id="photo-position" class="photo-position hidden"></div><div id="countdown" class="countdown"></div><div id="capture-status" class="capture-status hidden"></div><div id="progress" class="progress hidden"><div class="spinner"></div><h1 id="progress-title">Capture download progress</h1><div class="bar"><i id="bar-fill"></i></div><span id="percent">0%</span></div><img id="result" class="result hidden" alt="Your photo"></section><div id="empty" class="empty hidden"><h1>Photobooth ready</h1><p>Choose or create a session to begin.</p></div><footer id="event-footer" class="event-footer hidden"><div class="event-heading"><span class="event-eyebrow">NOW CELEBRATING</span><strong id="event"></strong></div><div class="event-stats"><div class="event-stat"><strong id="capture-count">0</strong><span>CAPTURES</span></div><span class="footer-divider"></span><div class="event-stat upload-stat"><i id="upload-indicator"></i><strong id="upload-status">ALL UPLOADED</strong><span id="upload-count"></span></div><span class="footer-divider"></span><div class="event-stat internet-stat"><i id="internet-indicator"></i><strong id="internet-status">CHECKING</strong><span>INTERNET</span></div></div></footer><div id="session-dialog" class="session-picker hidden" role="dialog" aria-modal="true"><div class="picker-card"><span class="picker-kicker">PHOTOBOOTH SESSION</span><h1>Choose a session</h1><p>Continue a recent session or start a new one.</p><div id="session-list" class="session-list"></div><label for="session-input">New session name</label><input id="session-input" maxlength="80" autocomplete="off"><div id="onscreen-keyboard" class="onscreen-keyboard"></div><button id="create-session" class="picker-create" disabled>Start new session</button><div id="picker-error" role="status"></div></div></div><div id="connection-status" class="connection-overlay hidden" role="status" aria-live="polite"><div><span class="connection-spinner"></span><h1>CONNECTION LOST</h1><p>Reconnecting to photobooth…</p></div></div><div id="error" class="error"></div></main><script src="/static/kiosk.js" defer></script></body></html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#080b0d">
+  <title>Photobooth</title>
+  <link rel="stylesheet" href="/static/kiosk.css">
+</head>
+<body>
+  <main id="screen" class="idle">
+    <div id="gallery" class="gallery"></div>
+    <section id="overlay" class="overlay hidden">
+      <div id="photo-position" class="photo-position hidden"></div>
+      <div id="countdown" class="countdown"></div>
+      <p id="capture-detail" class="capture-detail hidden"></p>
+      <img id="result" class="result hidden" alt="Your photo">
+    </section>
+    <div id="empty" class="empty hidden">
+      <h1>Photobooth ready</h1>
+      <p>Choose or create a session to begin.</p>
+    </div>
+    <footer id="event-footer" class="event-footer hidden">
+      <div class="event-heading">
+        <span class="event-eyebrow">NOW CELEBRATING</span>
+        <strong id="event"></strong>
+      </div>
+      <div class="event-stats">
+        <div class="event-stat"><strong id="capture-count">0</strong><span>CAPTURES</span></div>
+        <span class="footer-divider"></span>
+        <div class="event-stat upload-stat"><i id="upload-indicator"></i><strong id="upload-status">ALL UPLOADED</strong><span id="upload-count"></span></div>
+        <span class="footer-divider"></span>
+        <div id="admin-access" class="event-stat internet-stat" role="button" tabindex="0" aria-label="Hold to open the local admin panel"><i id="internet-indicator"></i><strong id="internet-status">CHECKING</strong><span>INTERNET</span></div>
+      </div>
+    </footer>
+    <div id="session-dialog" class="session-picker hidden" role="dialog" aria-modal="true">
+      <div class="picker-card">
+        <span class="picker-kicker">PHOTOBOOTH SESSION</span>
+        <h1>Choose a session</h1>
+        <p>Continue a recent session or start a new one.</p>
+        <div id="picker-options" class="picker-options">
+          <div id="session-list" class="session-list"></div>
+          <button id="start-new-session" class="picker-new" type="button">＋ New session</button>
+        </div>
+        <section id="new-session-form" class="new-session-form hidden">
+          <label for="session-input">New session name</label>
+          <input id="session-input" maxlength="80" autocomplete="off">
+          <div id="onscreen-keyboard" class="onscreen-keyboard"></div>
+          <div class="picker-form-actions">
+            <button id="back-to-sessions" class="picker-back" type="button">Back</button>
+            <button id="create-session" class="picker-create" type="button" disabled>Start session</button>
+          </div>
+        </section>
+        <div id="picker-error" role="status"></div>
+      </div>
+    </div>
+    <div id="connection-status" class="connection-overlay hidden" role="status" aria-live="polite">
+      <div><span class="connection-spinner"></span><h1>CONNECTION LOST</h1><p>Reconnecting to photobooth…</p></div>
+    </div>
+    <div id="admin-pin-dialog" class="admin-pin-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="admin-pin-title">
+      <form id="admin-pin-form" class="admin-pin-card">
+        <span class="picker-kicker">ADMIN ACCESS</span>
+        <h1 id="admin-pin-title">Enter PIN</h1>
+        <p>Enter the admin PIN to continue.</p>
+        <input id="admin-pin-input" type="password" inputmode="numeric" maxlength="12" autocomplete="current-password" aria-label="Admin PIN">
+        <div class="admin-pin-pad" aria-label="PIN keypad">
+          <button type="button" data-pin-digit="1">1</button><button type="button" data-pin-digit="2">2</button><button type="button" data-pin-digit="3">3</button>
+          <button type="button" data-pin-digit="4">4</button><button type="button" data-pin-digit="5">5</button><button type="button" data-pin-digit="6">6</button>
+          <button type="button" data-pin-digit="7">7</button><button type="button" data-pin-digit="8">8</button><button type="button" data-pin-digit="9">9</button>
+          <button type="button" data-pin-action="clear">Clear</button><button type="button" data-pin-digit="0">0</button><button type="button" data-pin-action="delete">⌫</button>
+        </div>
+        <div id="admin-pin-error" role="status"></div>
+        <div class="admin-pin-actions"><button id="admin-pin-back" type="button">Back</button><button type="submit">Continue</button></div>
+      </form>
+    </div>
+    <div id="error" class="error"></div>
+  </main>
+  <script src="/static/kiosk.js" defer></script>
+</body>
+</html>

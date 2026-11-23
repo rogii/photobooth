@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import hmac
 import json
 import os
 import shutil
@@ -18,7 +19,7 @@ import zipfile
 from datetime import datetime
 from pathlib import Path
 
-from flask import Flask, jsonify, request, send_file, send_from_directory
+from flask import Flask, jsonify, redirect, request, send_file, send_from_directory, session
 from PIL import Image, ImageDraw, ImageOps
 
 BASE = Path(__file__).resolve().parent
@@ -44,6 +45,8 @@ def read_config():
 class PhotoboothService:
     def __init__(self, demo=False):
         self.config = read_config()
+        self.config.setdefault("capture_lead_seconds", 1.2)
+        self.config.setdefault("admin_pin", "1234")
         self.demo = demo
         self.camera_lock = threading.Lock()
         self.state_lock = threading.Lock()
@@ -64,7 +67,6 @@ class PhotoboothService:
         self.recent_photo_version = ""
         self.recent_photo_time = None
         self.phase = "idle"
-        self.download_progress = 0
         self.photo_number = 0
         self.photo_total = 0
         self.gallery_revision = 0
@@ -231,6 +233,83 @@ class PhotoboothService:
         archive.seek(0)
         return item, archive
 
+    def local_admin_photos(self, session_id=None):
+        photos = []
+        sessions = self.list_sessions(include_hidden=True)
+        for item in sessions:
+            if session_id and item["id"] != session_id:
+                continue
+            folder = self.session_photo_dir(item)
+            if not folder.is_dir() or folder.is_symlink():
+                continue
+            for photo in folder.rglob("*"):
+                if photo.is_symlink() or not photo.is_file() or photo.suffix.lower() not in (".jpg", ".jpeg"):
+                    continue
+                relative = photo.relative_to(folder)
+                if "deleted" in {part.lower() for part in relative.parts}:
+                    continue
+                try:
+                    modified = photo.stat().st_mtime
+                except OSError:
+                    continue
+                photos.append({
+                    "session_id": item["id"],
+                    "session_name": item["name"],
+                    "relative_path": relative.as_posix(),
+                    "name": photo.name,
+                    "modified": modified,
+                })
+        photos.sort(key=lambda photo: photo["modified"], reverse=True)
+        return sessions, photos
+
+    def local_admin_photo_path(self, session_id, relative_path):
+        if not session_id or Path(session_id).name != session_id:
+            raise ValueError("Photo not found")
+        item = next((entry for entry in self.list_sessions(include_hidden=True) if entry["id"] == session_id), None)
+        if not item:
+            raise ValueError("Photo not found")
+        relative = Path(relative_path)
+        if relative.is_absolute() or not relative.parts or ".." in relative.parts or "deleted" in {part.lower() for part in relative.parts}:
+            raise ValueError("Photo not found")
+        root = self.session_photo_dir(item).resolve()
+        target = (root / relative).resolve()
+        if root not in target.parents or not target.is_file() or target.suffix.lower() not in (".jpg", ".jpeg"):
+            raise ValueError("Photo not found")
+        return root, target, relative
+
+    def move_local_admin_photos(self, photos):
+        moved = 0
+        with self.state_lock:
+            if self.busy:
+                raise RuntimeError("Wait for the current capture to finish")
+            seen = set()
+            for entry in photos:
+                session_id = str(entry.get("session_id", ""))
+                relative_path = str(entry.get("relative_path", ""))
+                key = (session_id, relative_path)
+                if key in seen:
+                    continue
+                seen.add(key)
+                root, source, relative = self.local_admin_photo_path(session_id, relative_path)
+                deleted_root = root / "deleted"
+                destination = deleted_root / relative
+                destination.parent.mkdir(parents=True, exist_ok=True)
+                if deleted_root.resolve() != root / "deleted" or root not in destination.parent.resolve().parents:
+                    raise ValueError("Invalid deleted photo path")
+                if destination.exists():
+                    index = 1
+                    while True:
+                        candidate = destination.with_name(f"{destination.stem}__{index}{destination.suffix}")
+                        if not candidate.exists():
+                            destination = candidate
+                            break
+                        index += 1
+                shutil.move(str(source), str(destination))
+                moved += 1
+            if moved:
+                self.gallery_revision += 1
+        return moved
+
     def _init_gpio(self):
         if self.demo:
             return
@@ -270,7 +349,6 @@ class PhotoboothService:
                 "flash_available": self.flash_available,
                 "demo": self.demo,
                 "phase": self.phase,
-                "download_progress": self.download_progress,
                 "photo_number": self.photo_number,
                 "photo_total": self.photo_total,
                 "gallery_version": f"{session['id'] if session else 'none'}:{self.gallery_revision}",
@@ -299,14 +377,21 @@ class PhotoboothService:
         with self.state_lock:
             if self.busy:
                 raise RuntimeError("Wait for the current capture to finish before changing settings")
+        admin_pin = None
+        if "admin_pin" in values:
+            admin_pin = str(values["admin_pin"]).strip()
+            if not admin_pin.isdigit() or not 4 <= len(admin_pin) <= 12:
+                raise ValueError("Admin PIN must contain 4 to 12 digits")
         previous_gpio_pin = self.config.get("gpio_flash_pin", 17)
-        allowed = {"countdown_seconds": (0, 30, int), "sequence_countdown_seconds": (0, 30, int), "sequence_interval_seconds": (0, 10, float), "idle_gallery_columns": (1, 12, int), "result_timeout_seconds": (1, 300, int), "gpio_flash_pin": (0, 27, int), "flash_seconds": (0, 5, float)}
+        allowed = {"countdown_seconds": (0, 30, int), "sequence_countdown_seconds": (0, 30, int), "capture_lead_seconds": (0, 5, float), "sequence_interval_seconds": (0, 10, float), "idle_gallery_columns": (1, 12, int), "result_timeout_seconds": (1, 300, int), "gpio_flash_pin": (0, 27, int), "flash_seconds": (0, 5, float)}
         for key, (low, high, cast) in allowed.items():
             if key in values:
                 self.config[key] = max(low, min(high, cast(values[key])))
         for key in ("camera_command", "upload_url", "upload_token", "key_single", "key_sequence"):
             if key in values:
                 self.config[key] = str(values[key]).strip()
+        if admin_pin is not None:
+            self.config["admin_pin"] = admin_pin
         if self.config.get("gpio_flash_pin", 17) != previous_gpio_pin:
             if self.flash:
                 self.flash.close()
@@ -451,33 +536,67 @@ class PhotoboothService:
                     self.photo_number = index + 1
                     self.photo_total = count
                     self.phase = "countdown"
+                capture_result = {}
+                capture_thread = None
+
+                def start_camera_capture():
+                    nonlocal capture_thread
+                    if capture_thread is not None:
+                        return
+
+                    def capture_in_background():
+                        try:
+                            if self.flash:
+                                self.flash.on()
+                                time.sleep(float(self.config.get("flash_seconds", 0.18)))
+                            capture_result["photo"] = self.capture_one(gallery_visible=(count == 1))
+                        except Exception as exc:
+                            capture_result["error"] = exc
+                        finally:
+                            if self.flash:
+                                self.flash.off()
+
+                    capture_thread = threading.Thread(
+                        target=capture_in_background,
+                        daemon=True,
+                        name="camera-trigger",
+                    )
+                    capture_thread.start()
+
+                capture_lead = max(0.0, min(5.0, float(self.config.get("capture_lead_seconds", 1.2))))
                 if photo_delay > 0:
+                    countdown_start = time.monotonic()
+                    zero_at = countdown_start + photo_delay + 0.65
+                    trigger_at = zero_at - capture_lead
                     for remaining in range(photo_delay, 0, -1):
                         self.set_countdown(str(remaining))
-                        time.sleep(1)
+                        tick_at = countdown_start + (photo_delay - remaining + 1)
+                        while time.monotonic() < tick_at:
+                            now = time.monotonic()
+                            if capture_thread is None and now >= trigger_at:
+                                start_camera_capture()
+                            time.sleep(min(0.025, max(0.001, tick_at - now)))
                     self.set_countdown("SMILE")
                     self.set_status("Smile!")
-                    time.sleep(0.65)
-                self.set_countdown("")
+                    while time.monotonic() < zero_at:
+                        now = time.monotonic()
+                        if capture_thread is None and now >= trigger_at:
+                            start_camera_capture()
+                        time.sleep(min(0.025, max(0.001, zero_at - now)))
+                else:
+                    self.set_countdown("")
+                    start_camera_capture()
+
+                if capture_thread is None:
+                    start_camera_capture()
                 with self.state_lock:
                     self.phase = "capturing"
                     self.status = f"Capturing photo {index + 1} of {count}"
-                if self.flash:
-                    self.flash.on()
-                    time.sleep(float(self.config.get("flash_seconds", 0.18)))
-                photo = self.capture_one(gallery_visible=(count == 1))
-                if self.flash:
-                    self.flash.off()
+                capture_thread.join()
+                if "error" in capture_result:
+                    raise capture_result["error"]
+                photo = capture_result["photo"]
                 files.append(photo)
-                # gPhoto2's capture-image-and-download command has completed for this frame.
-                with self.state_lock:
-                    self.phase = "downloading"
-                    self.photo_number = index + 1
-                    self.download_progress = 0
-                for progress in (12, 27, 43, 58, 74, 89, 100):
-                    with self.state_lock:
-                        self.download_progress = progress
-                    time.sleep(0.18)
                 if index + 1 < count:
                     time.sleep(interval)
             result = self.make_result(files)
@@ -521,7 +640,6 @@ class PhotoboothService:
             with self.state_lock:
                 if generation == self.capture_generation and not self.busy:
                     self.phase = "idle"
-                    self.download_progress = 0
                     self.photo_number = 0
                     self.photo_total = 0
 
@@ -645,12 +763,29 @@ class PhotoboothService:
 def create_app(service, admin_port=ADMIN_PORT):
     web = Flask(__name__, static_folder="static", static_url_path="/static")
     web.config["SEND_FILE_MAX_AGE_DEFAULT"] = 0
+    web.secret_key = os.urandom(32)
 
     @web.before_request
-    def admin_port_only():
-        protected = {"admin", "save_config", "admin_event", "admin_session_lock", "admin_session_stop", "admin_session_hidden", "admin_session_delete", "admin_session_download", "admin_capture", "restart_app", "get_admin_state"}
-        if request.endpoint in protected and int(request.environ.get("SERVER_PORT", 0)) != admin_port:
+    def admin_routes():
+        regular_admin = {"admin", "save_config", "admin_event", "admin_session_lock", "admin_session_stop", "admin_session_hidden", "admin_session_delete", "admin_session_download", "admin_capture", "restart_app", "get_admin_state"}
+        local_admin = {"local_admin_page", "local_admin_photos", "local_admin_photo", "local_admin_delete_photos", "local_admin_shutdown", "local_admin_change_pin"}
+        if request.endpoint in regular_admin and int(request.environ.get("SERVER_PORT", 0)) != admin_port:
             return jsonify({"error": f"Open the admin interface on port {admin_port}"}), 404
+        if request.endpoint in local_admin and not session.get("admin_unlocked"):
+            if request.endpoint == "local_admin_page":
+                kiosk_url = request.url_root.replace(f":{admin_port}/", ":8080/")
+                return redirect(kiosk_url)
+            return jsonify({"error": "Admin PIN required"}), 401
+
+    @web.post("/api/admin/unlock")
+    def admin_unlock():
+        payload = request.get_json(silent=True) or {}
+        expected = str(service.config.get("admin_pin", "1234"))
+        provided = str(payload.get("pin", ""))
+        if not hmac.compare_digest(provided, expected):
+            return jsonify({"error": "Invalid PIN"}), 401
+        session["admin_unlocked"] = True
+        return jsonify({"unlocked": True})
 
     @web.get("/")
     def index():
@@ -662,12 +797,66 @@ def create_app(service, admin_port=ADMIN_PORT):
     def admin():
         return send_from_directory(BASE / "static", "admin.html")
 
+    @web.get("/local-admin")
+    def local_admin_page():
+        return send_from_directory(BASE / "static", "local-admin.html")
+
     @web.get("/api/admin/state")
     def get_admin_state():
         result = service.state()
         result["sessions"] = service.list_sessions(include_hidden=True)
-        result["config"] = {key: service.config.get(key, "") for key in ("countdown_seconds", "sequence_countdown_seconds", "sequence_interval_seconds", "idle_gallery_columns", "result_timeout_seconds", "camera_command", "upload_url", "gpio_flash_pin", "flash_seconds", "key_single", "key_sequence")}
+        result["config"] = {key: service.config.get(key, "") for key in ("countdown_seconds", "sequence_countdown_seconds", "capture_lead_seconds", "sequence_interval_seconds", "idle_gallery_columns", "result_timeout_seconds", "camera_command", "upload_url", "gpio_flash_pin", "flash_seconds", "key_single", "key_sequence")}
         return jsonify(result)
+
+    @web.get("/api/local-admin/photos")
+    def local_admin_photos():
+        sessions, photos = service.local_admin_photos(request.args.get("session_id"))
+        return jsonify({"sessions": sessions, "photos": photos})
+
+    @web.get("/api/local-admin/photo/<session_id>/<path:relative_path>")
+    def local_admin_photo(session_id, relative_path):
+        try:
+            _, photo, _ = service.local_admin_photo_path(session_id, relative_path)
+            return send_file(photo, mimetype="image/jpeg", max_age=0)
+        except ValueError as exc:
+            return jsonify({"error": str(exc)}), 404
+
+    @web.post("/api/local-admin/delete-photos")
+    def local_admin_delete_photos():
+        payload = request.get_json(silent=True) or {}
+        photos = payload.get("photos", [])
+        if not isinstance(photos, list) or not all(isinstance(photo, dict) for photo in photos):
+            return jsonify({"error": "Invalid photo selection"}), 400
+        try:
+            moved = service.move_local_admin_photos(photos)
+            return jsonify({"moved": moved})
+        except (ValueError, RuntimeError, OSError) as exc:
+            return jsonify({"error": str(exc)}), 400
+
+    @web.post("/api/local-admin/shutdown")
+    def local_admin_shutdown():
+        try:
+            result = subprocess.run(
+                ["sudo", "-n", "/usr/bin/systemctl", "poweroff"],
+                capture_output=True,
+                text=True,
+                timeout=5,
+            )
+        except (OSError, subprocess.TimeoutExpired) as exc:
+            return jsonify({"error": f"Could not request shutdown: {exc}"}), 500
+        if result.returncode:
+            message = (result.stderr or result.stdout or "Shutdown was not authorized").strip()
+            return jsonify({"error": message}), 500
+        return jsonify({"shutting_down": True}), 202
+
+    @web.post("/api/local-admin/pin")
+    def local_admin_change_pin():
+        payload = request.get_json(silent=True) or {}
+        try:
+            service.update_config({"admin_pin": payload.get("admin_pin", "")})
+            return jsonify({"saved": True})
+        except (ValueError, TypeError, RuntimeError) as exc:
+            return jsonify({"error": str(exc)}), 400
 
     @web.post("/api/admin/event")
     def admin_event():
@@ -758,7 +947,7 @@ def create_app(service, admin_port=ADMIN_PORT):
     @web.get("/api/state")
     def get_state():
         state = service.state()
-        public = {key: state[key] for key in ("session", "busy", "status", "countdown", "download_progress", "photo_number", "photo_total", "recent_photo", "recent_photo_version", "phase", "gallery_version", "gallery_columns", "capture_count", "queued_uploads", "sessions", "locked_session", "host_info")}
+        public = {key: state[key] for key in ("session", "busy", "status", "countdown", "photo_number", "photo_total", "recent_photo", "recent_photo_version", "phase", "gallery_version", "gallery_columns", "capture_count", "queued_uploads", "sessions", "locked_session", "host_info")}
         public["server_instance_id"] = SERVER_INSTANCE_ID
         public["keys"] = {"single": service.config.get("key_single", "a"), "sequence": service.config.get("key_sequence", "b")}
         return jsonify(public)

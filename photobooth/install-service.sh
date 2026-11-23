@@ -25,4 +25,11 @@ EOF
 
 systemctl --user daemon-reload
 systemctl --user enable --now photobooth.service
+
+USER_NAME="$(id -un)"
+printf '%s ALL=(root) NOPASSWD: /usr/bin/systemctl poweroff\n' "$USER_NAME" \
+  | sudo tee /etc/sudoers.d/photobooth-poweroff >/dev/null
+sudo chmod 0440 /etc/sudoers.d/photobooth-poweroff
+sudo visudo -c -f /etc/sudoers.d/photobooth-poweroff
+
 echo "Photobooth service installed and started. Restart with: systemctl --user restart photobooth"
