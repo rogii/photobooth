@@ -26,7 +26,7 @@ This folder currently contains the design plan only. The implementation and exac
 - **Image storage:** Object storage or a dedicated persistent media store, separate from the database and outside the web root. Store generated identifiers rather than trusting uploaded filenames.
 - **Browser UI:** Server-rendered pages with focused JavaScript for browsing, voting, reporting, moderation, and slideshow playback. A separate frontend framework is not required for the first version.
 - **Live updates:** Server-Sent Events (SSE) can notify gallery and slideshow pages of session changes. Clients then fetch updated photo metadata. Short polling is a simpler fallback for an initial implementation.
-- **TV display API:** Provide pairing, session assignment, slideshow data, and vote endpoints for the separately deployed TV client. Each Pi opens the same stable gallery URL. A new or unpaired TV displays a setup code; an administrator enters that code in the gallery admin interface and assigns a session to the TV. Pairing gives the display a stable identity, so it can show its assigned session on later visits without a session-specific URL. Setup codes should expire after pairing or timeout; the TV should retain a separate revocable device credential.
+- **TV display API:** Provide pairing, session assignment, slideshow data, and vote endpoints for the separately deployed TV client. After its local phone-based Wi-Fi setup connects it to the internet, each Pi opens the same stable gallery URL. A new or unpaired TV displays a setup code; an administrator enters that code in the gallery admin interface and assigns a session to the TV. Pairing gives the display a stable identity, so it can show its assigned session on later visits without a session-specific URL. Setup codes should expire after pairing or timeout; the TV should retain a separate revocable device credential.
 
 The gallery server should be deployed independently from both the booth service and the TV display client. The photobooth remains responsible for capture and its persistent upload queue; the gallery handles shared browsing, slideshow data, voting, reporting, TV pairing, and moderation. This keeps photo browsing available when booth hardware is offline. The separate [`tv-display/`](../tv-display/) component is installed on the Pi Zero and handles local Wi-Fi setup, GPIO buttons, and launching the browser against the gallery service.
 
@@ -74,7 +74,7 @@ Manual previous/next controls must not create a new vote opportunity. When manua
 
 ### TV setup and pairing
 
-On first boot, the Pi connects to venue Wi-Fi through a local setup flow, then opens the stable gallery TV URL. Until an administrator pairs it, the screen displays a setup code. The administrator enters the code in the gallery admin interface and selects the session for that display. The gallery stores the assignment against the paired TV identity; changing the session or revoking the display is an admin action. The same setup code must not act as the long-lived device credential.
+After the Pi has internet access through its own phone-based Wi-Fi setup flow, it opens the stable gallery TV URL. Until an administrator pairs it, the screen displays a setup code. The administrator enters the code in the gallery admin interface and selects the session for that display. The gallery stores the assignment against the paired TV identity; changing the session or revoking the display is an admin action. The same setup code must not act as the long-lived device credential. Wi-Fi onboarding itself belongs to the separately deployed [`tv-display/`](../tv-display/) client, not the hosted gallery.
 
 ## Upload and moderation safeguards
 
@@ -94,7 +94,6 @@ The upload API should authenticate each booth, enforce request and image size li
 
 - What makes a session “active”: an explicit admin action, booth activity, or both?
 - How should a booth authenticate, and should booths be able to create sessions or only upload into assigned sessions?
-- How should a Pi initially connect to venue Wi-Fi, and what recovery flow should it show when saved Wi-Fi credentials stop working?
 - How long should sessions and original image files be retained?
 - Should the service be public, event-password protected, or configurable per session?
 - What defaults should control slideshow timing, vote weighting, report threshold, and moderation access?
