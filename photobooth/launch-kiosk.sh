@@ -26,4 +26,4 @@ if [[ "$READY" != 1 ]]; then
   exit 1
 fi
 
-"$BROWSER" --kiosk --no-first-run --noerrdialogs --disable-infobars --disable-session-crashed-bubble http://127.0.0.1:8080
+"$BROWSER" --kiosk --no-first-run --noerrdialogs --disable-infobars --disable-session-crashed-bubble --password-store=basic http://127.0.0.1:8080

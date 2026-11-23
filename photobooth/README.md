@@ -24,7 +24,7 @@ chmod +x install.sh launch-kiosk.sh
 ./install.sh
 ```
 
-Run the installer as the desktop user, not as root. The script installs dependencies, creates the Python virtual environment, installs a `systemd --user` service, and adds Chromium to the desktop autostart. It uses `sudo` for system packages and restricted permission to run the shutdown command. The installation user is added to the `gpio` group, and GPIO devices are given read and write access for that group. If the user was recently added to the group, restart the Pi so the service receives the new group access. Also add any other accounts that need to use the flash to the `gpio` group.
+Run the installer as the desktop user, not as root. The script installs dependencies, creates the Python virtual environment, installs a `systemd --user` service, and adds Chromium to the desktop autostart. Chromium is launched with its basic password store so kiosk startup does not ask to create a desktop keyring. It uses `sudo` for system packages and restricted permission to run the shutdown command. The installation user is added to the `gpio` group, and GPIO devices are given read and write access for that group. If the user was recently added to the group, restart the Pi so the service receives the new group access. Also add any other accounts that need to use the flash to the `gpio` group.
 
 The kiosk is available locally on port 8080. The regular admin panel uses port 8081.
 
