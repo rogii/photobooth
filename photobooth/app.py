@@ -8,9 +8,13 @@ import json
 import os
 import shutil
 import subprocess
+import tempfile
 import threading
 import time
+import urllib.error
+import urllib.request
 import uuid
+import zipfile
 from datetime import datetime
 from pathlib import Path
 
@@ -25,6 +29,7 @@ UPLOAD_QUEUE = DATA / "upload-queue"
 LAST_SESSION = DATA / "last-session.json"
 DISPLAY_FILE = DATA / "latest-display.jpg"
 NEXT_DISPLAY_FILE = DATA / "latest-display-next.jpg"
+LOCKED_SESSION = DATA / "locked-session.json"
 ADMIN_PORT = 8081
 SERVER_INSTANCE_ID = uuid.uuid4().hex
 
@@ -48,8 +53,10 @@ class PhotoboothService:
         self.countdown = ""
         self.session = None
         self.last_session = self._read_last_session()
-        if self.last_session:
-            self.session = dict(self.last_session)
+        self.locked_session = self._read_session_file(LOCKED_SESSION)
+        if self.locked_session:
+            self.session = dict(self.locked_session)
+            self.last_session = dict(self.locked_session)
             self.status = f"Session ready · {self.session['name']}"
         self.flash = None
         self.flash_available = False
@@ -62,6 +69,9 @@ class PhotoboothService:
         self.photo_total = 0
         self.gallery_revision = 0
         self.capture_generation = 0
+        self.host_info_lock = threading.Lock()
+        self.internet_checked_at = 0.0
+        self.internet_connected = False
 
         DATA.mkdir(parents=True, exist_ok=True)
         SESSIONS.mkdir(parents=True, exist_ok=True)
@@ -77,6 +87,149 @@ class PhotoboothService:
         except (OSError, json.JSONDecodeError, TypeError):
             pass
         return None
+
+    @staticmethod
+    def _read_session_file(path):
+        try:
+            value = json.loads(path.read_text())
+            if (SESSIONS / value.get("id", "")).is_dir():
+                return value
+        except (OSError, json.JSONDecodeError, TypeError, AttributeError):
+            pass
+        return None
+
+    def list_sessions(self, include_hidden=False):
+        latest = self._read_session_file(LAST_SESSION)
+        sessions = []
+        for folder in SESSIONS.iterdir():
+            if not folder.is_dir():
+                continue
+            try:
+                metadata = json.loads((folder / "session.json").read_text())
+            except (OSError, json.JSONDecodeError):
+                metadata = {}
+            if latest and latest.get("id") == folder.name:
+                metadata = {**latest, **metadata}
+            try:
+                stamp = (folder / "session.json").stat().st_mtime
+            except OSError:
+                stamp = folder.stat().st_mtime
+            try:
+                sort_time = datetime.fromisoformat(metadata.get("created_at", "")).timestamp()
+            except (TypeError, ValueError):
+                sort_time = stamp
+            sessions.append({
+                "id": folder.name,
+                "name": metadata.get("name") or folder.name,
+                "created_at": metadata.get("created_at", ""),
+                "photo_dir": metadata.get("photo_dir", ""),
+                "sort_time": sort_time,
+                "locked": bool(self.locked_session and self.locked_session.get("id") == folder.name),
+                "hidden": bool(metadata.get("hidden", False)),
+                "active": bool(self.session and self.session.get("id") == folder.name),
+            })
+        sessions.sort(key=lambda item: item["sort_time"], reverse=True)
+        return sessions if include_hidden else [item for item in sessions if not item["hidden"]]
+
+    def host_info(self):
+        now = time.monotonic()
+        with self.host_info_lock:
+            if now - self.internet_checked_at >= 20:
+                try:
+                    with urllib.request.urlopen("https://connectivitycheck.gstatic.com/generate_204", timeout=2) as response:
+                        self.internet_connected = 200 <= response.status < 300
+                except (OSError, urllib.error.URLError):
+                    self.internet_connected = False
+                self.internet_checked_at = time.monotonic()
+            try:
+                disk = shutil.disk_usage(DATA)
+                used = disk.used
+                total = disk.total
+                free = disk.free
+                percent = round(used * 100 / total, 1) if total else 0
+            except OSError:
+                used = total = free = 0
+                percent = 0
+            return {
+                "disk": {"path": str(DATA), "used_bytes": used, "total_bytes": total, "free_bytes": free, "used_percent": percent},
+                "internet_connected": self.internet_connected,
+            }
+
+    @staticmethod
+    def session_from_item(item):
+        return {key: item[key] for key in ("id", "name", "created_at", "hidden", "photo_dir") if key in item}
+
+    def session_photo_dir(self, session):
+        directory = session.get("photo_dir", "")
+        candidate = DATA / directory if directory and Path(directory).name == directory and directory not in (".", "..") else None
+        reserved = {DATA.resolve(), SESSIONS.resolve(), UPLOAD_QUEUE.resolve()}
+        if candidate and candidate.resolve().parent == DATA.resolve() and candidate.resolve() not in reserved:
+            return candidate
+        legacy_name = self.safe_event_name(session["name"])
+        if legacy_name in {SESSIONS.name, UPLOAD_QUEUE.name}:
+            legacy_name = f"{legacy_name}--legacy-{session['id']}"
+        return DATA / legacy_name
+
+    def set_session_hidden(self, session_id, hidden):
+        with self.state_lock:
+            if self.busy:
+                raise RuntimeError("Wait for the current capture to finish")
+            folder = SESSIONS / session_id
+            if folder.name != session_id or folder.is_symlink() or not folder.is_dir():
+                raise ValueError("Session not found")
+            item = next((item for item in self.list_sessions(include_hidden=True) if item["id"] == session_id), None)
+            if not item:
+                raise ValueError("Session not found")
+            session = self.session_from_item(item)
+            session["hidden"] = bool(hidden)
+            (folder / "session.json").write_text(json.dumps(session, ensure_ascii=False, indent=2))
+            return session
+
+    def delete_session(self, session_id):
+        with self.state_lock:
+            if self.busy:
+                raise RuntimeError("Wait for the current capture to finish")
+            folder = SESSIONS / session_id
+            if folder.name != session_id or folder.is_symlink() or not folder.is_dir():
+                raise ValueError("Session not found")
+            item = next((item for item in self.list_sessions(include_hidden=True) if item["id"] == session_id), None)
+            if not item:
+                raise ValueError("Session not found")
+            photo_dir = self.session_photo_dir(item)
+            if photo_dir.is_dir() and not photo_dir.is_symlink():
+                shutil.rmtree(photo_dir, ignore_errors=True)
+            shutil.rmtree(folder)
+            for job in UPLOAD_QUEUE.glob("*.json"):
+                try:
+                    if json.loads(job.read_text()).get("session_id") == session_id:
+                        job.unlink(missing_ok=True)
+                except (OSError, json.JSONDecodeError):
+                    continue
+            if self.session and self.session.get("id") == session_id:
+                self.session = None
+                self.status = "Choose or create a session"
+                self.phase = "idle"
+            if self.last_session and self.last_session.get("id") == session_id:
+                self.last_session = None
+                LAST_SESSION.unlink(missing_ok=True)
+            if self.locked_session and self.locked_session.get("id") == session_id:
+                self.locked_session = None
+                LOCKED_SESSION.unlink(missing_ok=True)
+            return {"deleted": session_id}
+
+    def session_archive(self, session_id):
+        item = next((item for item in self.list_sessions(include_hidden=True) if item["id"] == session_id), None)
+        if not item:
+            raise ValueError("Session not found")
+        folder = self.session_photo_dir(item)
+        archive = tempfile.SpooledTemporaryFile(max_size=16 * 1024 * 1024, mode="w+b")
+        with zipfile.ZipFile(archive, "w", zipfile.ZIP_DEFLATED) as zipped:
+            if folder.is_dir():
+                for photo in sorted(folder.rglob("*")):
+                    if photo.is_file() and photo.suffix.lower() in (".jpg", ".jpeg"):
+                        zipped.write(photo, Path(self.safe_event_name(item["name"])) / photo.relative_to(folder))
+        archive.seek(0)
+        return item, archive
 
     def _init_gpio(self):
         if self.demo:
@@ -95,7 +248,7 @@ class PhotoboothService:
     def state(self):
         with self.state_lock:
             session = dict(self.session) if self.session else None
-            event_folder = DATA / self.safe_event_name(session["name"]) if session else None
+            event_folder = self.session_photo_dir(session) if session else None
             capture_count = len(list(event_folder.glob("*.jpg"))) if event_folder and event_folder.is_dir() else 0
             photo_visible = bool(
                 self.recent_photo
@@ -105,6 +258,8 @@ class PhotoboothService:
             return {
                 "session": session,
                 "last_session": dict(self.last_session) if self.last_session else None,
+                "sessions": self.list_sessions(),
+                "locked_session": dict(self.locked_session) if self.locked_session else None,
                 "busy": self.busy,
                 "status": self.status,
                 "countdown": self.countdown,
@@ -120,13 +275,14 @@ class PhotoboothService:
                 "photo_total": self.photo_total,
                 "gallery_version": f"{session['id'] if session else 'none'}:{self.gallery_revision}",
                 "gallery_columns": max(1, min(12, int(self.config.get("idle_gallery_columns", 3)))),
+                "host_info": self.host_info(),
             }
 
     def gallery(self, rows=3):
         event = self.session
         if not event:
             return []
-        folder = DATA / self.safe_event_name(event["name"])
+        folder = self.session_photo_dir(event)
         if not folder.is_dir():
             return []
         files = sorted(folder.glob("*.jpg"), key=lambda path: path.name, reverse=True)
@@ -179,13 +335,78 @@ class PhotoboothService:
                 "id": f"{now.strftime('%Y%m%d-%H%M%S')}-{uuid.uuid4().hex[:6]}",
                 "name": name.strip(),
                 "created_at": now.isoformat(),
+                "hidden": False,
             }
+            self.session["photo_dir"] = f"{self.safe_event_name(self.session['name'])}--{self.session['id']}"
             self.last_session = dict(self.session)
             self.status = f"Session ready · {self.session['name']}"
-            (DATA / self.safe_event_name(self.session["name"])).mkdir(parents=True, exist_ok=True)
+            self.session_photo_dir(self.session).mkdir(parents=True, exist_ok=True)
             (SESSIONS / self.session["id"]).mkdir(parents=True, exist_ok=True)
             LAST_SESSION.write_text(json.dumps(self.session, ensure_ascii=False, indent=2))
+            (SESSIONS / self.session["id"] / "session.json").write_text(json.dumps(self.session, ensure_ascii=False, indent=2))
             return dict(self.session)
+
+    def select_session(self, session_id, allow_hidden=False):
+        with self.state_lock:
+            if self.busy:
+                raise RuntimeError("Wait for the current capture to finish")
+            folder = SESSIONS / session_id
+            if folder.name != session_id or folder.is_symlink() or not folder.is_dir():
+                raise ValueError("Session not found")
+            item = next((item for item in self.list_sessions(include_hidden=allow_hidden) if item["id"] == session_id), None)
+            if not item:
+                raise ValueError("Session not found")
+            if item["hidden"] and not allow_hidden:
+                raise ValueError("This session is hidden from kiosk selection")
+            self.session = self.session_from_item(item)
+            self.last_session = dict(self.session)
+            self.status = f"Session resumed · {self.session['name']}"
+            LAST_SESSION.write_text(json.dumps(self.session, ensure_ascii=False, indent=2))
+            (folder / "session.json").write_text(json.dumps(self.session, ensure_ascii=False, indent=2))
+            return dict(self.session)
+
+    def lock_session(self, session_id=None):
+        with self.state_lock:
+            if self.busy:
+                raise RuntimeError("Wait for the current capture to finish")
+            if session_id:
+                folder = SESSIONS / session_id
+                if folder.name != session_id or folder.is_symlink() or not folder.is_dir():
+                    raise ValueError("Session not found")
+                item = next((item for item in self.list_sessions(include_hidden=True) if item["id"] == session_id), None)
+                if not item:
+                    raise ValueError("Session not found")
+                self.locked_session = self.session_from_item(item)
+                self.session = dict(self.locked_session)
+                self.last_session = dict(self.session)
+                LAST_SESSION.write_text(json.dumps(self.session, ensure_ascii=False, indent=2))
+                LOCKED_SESSION.write_text(json.dumps(self.locked_session, ensure_ascii=False, indent=2))
+                (folder / "session.json").write_text(json.dumps(self.locked_session, ensure_ascii=False, indent=2))
+            else:
+                self.locked_session = None
+                self.session = None
+                self.last_session = None
+                self.status = "Choose or create a session"
+                self.phase = "idle"
+                LOCKED_SESSION.unlink(missing_ok=True)
+                LAST_SESSION.unlink(missing_ok=True)
+            return dict(self.locked_session) if self.locked_session else None
+
+    def stop_session(self):
+        with self.state_lock:
+            if self.busy:
+                raise RuntimeError("Wait for the current capture to finish")
+            self.session = None
+            self.last_session = None
+            self.locked_session = None
+            self.status = "Choose or create a session"
+            self.phase = "idle"
+            self.recent_photo = None
+            self.recent_photo_version = ""
+            self.recent_photo_time = None
+            LOCKED_SESSION.unlink(missing_ok=True)
+            LAST_SESSION.unlink(missing_ok=True)
+            return {"stopped": True}
 
     def resume_session(self):
         with self.state_lock:
@@ -260,7 +481,7 @@ class PhotoboothService:
                 if index + 1 < count:
                     time.sleep(interval)
             result = self.make_result(files)
-            event_folder = DATA / self.safe_event_name(self.session["name"])
+            event_folder = self.session_photo_dir(self.session)
             event_folder.mkdir(parents=True, exist_ok=True)
             if result.parent != event_folder:
                 stored = event_folder / f"{datetime.now().strftime('%Y%m%d-%H%M%S-%f')}-strip.jpg"
@@ -306,7 +527,7 @@ class PhotoboothService:
 
     def capture_one(self, gallery_visible=True):
         session = self.session
-        folder = DATA / self.safe_event_name(session["name"])
+        folder = self.session_photo_dir(session)
         if not gallery_visible:
             folder = folder / "singles"
         folder.mkdir(parents=True, exist_ok=True)
@@ -427,12 +648,14 @@ def create_app(service, admin_port=ADMIN_PORT):
 
     @web.before_request
     def admin_port_only():
-        protected = {"admin", "save_config", "admin_event", "admin_capture", "restart_app", "get_admin_state"}
+        protected = {"admin", "save_config", "admin_event", "admin_session_lock", "admin_session_stop", "admin_session_hidden", "admin_session_delete", "admin_session_download", "admin_capture", "restart_app", "get_admin_state"}
         if request.endpoint in protected and int(request.environ.get("SERVER_PORT", 0)) != admin_port:
             return jsonify({"error": f"Open the admin interface on port {admin_port}"}), 404
 
     @web.get("/")
     def index():
+        if int(request.environ.get("SERVER_PORT", 0)) == admin_port:
+            return send_from_directory(BASE / "static", "admin.html")
         return send_from_directory(BASE / "static", "index.html")
 
     @web.get("/admin")
@@ -442,6 +665,7 @@ def create_app(service, admin_port=ADMIN_PORT):
     @web.get("/api/admin/state")
     def get_admin_state():
         result = service.state()
+        result["sessions"] = service.list_sessions(include_hidden=True)
         result["config"] = {key: service.config.get(key, "") for key in ("countdown_seconds", "sequence_countdown_seconds", "sequence_interval_seconds", "idle_gallery_columns", "result_timeout_seconds", "camera_command", "upload_url", "gpio_flash_pin", "flash_seconds", "key_single", "key_sequence")}
         return jsonify(result)
 
@@ -452,6 +676,46 @@ def create_app(service, admin_port=ADMIN_PORT):
             return jsonify({"session": service.create_session(str(payload.get("name", "")))})
         except (ValueError, RuntimeError) as exc:
             return jsonify({"error": str(exc)}), 400
+
+    @web.post("/api/admin/session-lock")
+    def admin_session_lock():
+        payload = request.get_json(silent=True) or {}
+        try:
+            return jsonify({"locked_session": service.lock_session(payload.get("session_id"))})
+        except (ValueError, RuntimeError) as exc:
+            return jsonify({"error": str(exc)}), 400
+
+    @web.post("/api/admin/session-stop")
+    def admin_session_stop():
+        try:
+            return jsonify(service.stop_session())
+        except RuntimeError as exc:
+            return jsonify({"error": str(exc)}), 400
+
+    @web.post("/api/admin/session-hidden")
+    def admin_session_hidden():
+        payload = request.get_json(silent=True) or {}
+        try:
+            return jsonify({"session": service.set_session_hidden(str(payload.get("session_id", "")), bool(payload.get("hidden")))})
+        except (ValueError, RuntimeError) as exc:
+            return jsonify({"error": str(exc)}), 400
+
+    @web.post("/api/admin/session-delete")
+    def admin_session_delete():
+        payload = request.get_json(silent=True) or {}
+        try:
+            return jsonify(service.delete_session(str(payload.get("session_id", ""))))
+        except (ValueError, RuntimeError) as exc:
+            return jsonify({"error": str(exc)}), 400
+
+    @web.get("/api/admin/session-download/<session_id>")
+    def admin_session_download(session_id):
+        try:
+            session, archive = service.session_archive(session_id)
+            download_name = f"{service.safe_event_name(session['name'])}-{session_id}.zip"
+            return send_file(archive, mimetype="application/zip", as_attachment=True, download_name=download_name, max_age=0)
+        except ValueError as exc:
+            return jsonify({"error": str(exc)}), 404
 
     @web.post("/api/admin/capture")
     def admin_capture():
@@ -494,7 +758,7 @@ def create_app(service, admin_port=ADMIN_PORT):
     @web.get("/api/state")
     def get_state():
         state = service.state()
-        public = {key: state[key] for key in ("session", "busy", "status", "countdown", "download_progress", "photo_number", "photo_total", "recent_photo", "recent_photo_version", "phase", "gallery_version", "gallery_columns", "capture_count", "queued_uploads")}
+        public = {key: state[key] for key in ("session", "busy", "status", "countdown", "download_progress", "photo_number", "photo_total", "recent_photo", "recent_photo_version", "phase", "gallery_version", "gallery_columns", "capture_count", "queued_uploads", "sessions", "locked_session", "host_info")}
         public["server_instance_id"] = SERVER_INSTANCE_ID
         public["keys"] = {"single": service.config.get("key_single", "a"), "sequence": service.config.get("key_sequence", "b")}
         return jsonify(public)
@@ -522,6 +786,15 @@ def create_app(service, admin_port=ADMIN_PORT):
     def resume_session():
         try:
             return jsonify({"session": service.resume_session()})
+        except (ValueError, RuntimeError) as exc:
+            return jsonify({"error": str(exc)}), 400
+
+    @web.post("/api/session/select")
+    def select_session():
+        payload = request.get_json(silent=True) or {}
+        try:
+            allow_hidden = int(request.environ.get("SERVER_PORT", 0)) == admin_port
+            return jsonify({"session": service.select_session(str(payload.get("id", "")), allow_hidden=allow_hidden)})
         except (ValueError, RuntimeError) as exc:
             return jsonify({"error": str(exc)}), 400
 
