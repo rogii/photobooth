@@ -1,48 +1,75 @@
-# Raspberry Pi fotobås – provskott
+# Raspberry Pi fotobås
 
-En första, lokal prototyp med Python/Tkinter. Den kan köras med mus/touch eller med en Bluetooth-knapp som skickar tangentbordskommandona `a` (en bild) och `b` (fyra bilder). Fyrbildsläget sparar originalen och skapar ett 2×2-kollage.
+Fotobåset körs som en lokal Flask-webbapp i Chromium kiosk mode. Gränssnittet är vanlig HTML, CSS och JavaScript, så det går att prova och ändra i en vanlig webbläsare utan Raspberry Pi eller kamera.
 
-## Installation på Raspberry Pi OS
+## Prova gränssnittet lokalt
 
-Lägg projektet på Pi:n och kör från skrivbordsterminalen:
+Från projektmappen:
+
+```sh
+python3 -m venv .venv
+.venv/bin/pip install -r requirements.txt
+.venv/bin/python app.py --demo
+```
+
+Öppna sedan [http://127.0.0.1:8080](http://127.0.0.1:8080). Demoläget skapar exempelbilder och låtsasfoton utan kamera eller GPIO. Det går även att visa webbsidan från en annan dator på samma nätverk genom att starta servern med `--host 0.0.0.0`; använd då Pi:ns eller datorns IP-adress på port 8080.
+
+## Raspberry Pi kiosk
+
+Kör på Raspberry Pi OS Desktop:
 
 ```sh
 cd photobooth
-chmod +x install.sh
+chmod +x install.sh launch-kiosk.sh
 ./install.sh
 ```
 
-Skriptet installerar Python, Tkinter, GPIOZero/lgpio och gPhoto2, skapar en virtuell miljö och lägger till en desktop-autostartfil för den inloggade skrivbordsanvändaren. För autostart efter omstart ska Raspberry Pi OS starta direkt till skrivbordet med automatisk inloggning aktiverad (ställ in via `sudo raspi-config` → System Options → Boot / Auto Login → Desktop Autologin). Appen startar då från skrivbordets autostart. Den behöver en grafisk session; detta är inte en headless systemd-tjänst.
+Installationsskriptet installerar Python, Flask, gPhoto2 och Chromium, skapar `.venv`, installerar en `systemd --user`-tjänst och lägger Chromium kiosk i skrivbordets autostart. Kör skriptet som skrivbordsanvändaren, utan `sudo`. För autostart efter omstart ska Raspberry Pi OS starta till skrivbordet med automatisk inloggning (`sudo raspi-config` → System Options → Boot / Auto Login → Desktop Autologin).
 
-Kameran ansluts via USB. Kontrollera först att den upptäcks och prova livevy:
+Starta om webbservern över SSH eller från terminalen:
+
+```sh
+systemctl --user restart photobooth.service
+```
+
+Visa status och loggar med `systemctl --user status photobooth.service` och `journalctl --user -u photobooth.service -f`. Chromium ligger kvar öppet och ansluter igen efter omstarten.
+
+Kameran ansluts via USB. Kontrollera anslutningen från terminalen:
 
 ```sh
 gphoto2 --auto-detect
 gphoto2 --capture-preview --filename /tmp/preview.jpg
 ```
 
-Installationsskriptet måste köras som den användare som ska logga in på skrivbordet (vid körning via sudo används `SUDO_USER`).
+På Raspberry Pi OS använder kioskstartaren Chromium i helskärmsläge på `http://127.0.0.1:8080`. Servern lyssnar även på nätverksgränssnitten så en annan dator på samma nät kan öppna Pi:ns adress på port 8080.
+
+## Anslutning till befintlig Pi
+
+- SSH-värd: `10.66.25.48`
+- SSH-användare: `jonas`
+- Klonad repo: `/home/jonas/photobooth`
+- Appkatalog som tjänsten kör från: `/home/jonas/photobooth/photobooth`
+- Tjänst: `photobooth.service` (systemd user service)
+
+Anslut med `ssh jonas@10.66.25.48`. Synka projektets `photobooth/`-katalog till samma sökväg under klonens rot, med relativa sökvägar bevarade, så att appens `static/`-filer hamnar i appkatalogens `static/`. Starta sedan om tjänsten med `systemctl --user restart photobooth.service` och kontrollera den med `systemctl --user status photobooth.service`.
+
+## Funktioner
+
+- Ingen kameraförhandsvisning hämtas i viloläge. Efter en exponering visas fotot i huvudytan i 10 sekunder, eller tills nästa fotografering startar.
+- Enstaka bilder och 2×2-kollage av fyra bilder, med justerbar nedräkning och intervall.
+- Touchvänligt tangentbord för sessionsnamn och Bluetoothknapp som skickar `a` eller `b`.
+- GPIO-blixt med standard BCM 17. Driv inte LED-slingor direkt från Pi:n; använd lämplig transistor/MOSFET eller LED-styrenhet och separat strömförsörjning.
+- Beständig lokal uppladdningskö. `upload_url` och `upload_token` i `config.json` styr multipart-uppladdning.
+- Tillfällig stoppknapp i gränssnittet för testkörningar.
 
 ## Inställningar
 
 Redigera `config.json`:
 
-- `countdown_seconds`: nedräkningens standardvärde (kan också justeras i touchvyn).
-- `sequence_interval_seconds`: intervall mellan exponeringarna i fyrbildsläget (justeras också i touchvyn).
-- `gpio_flash_pin`: GPIO-nummer, standard BCM 17.
-- `flash_seconds`: hur länge GPIO-signalen är aktiv vid varje exponering.
+- `countdown_seconds`: standardnedräkning.
+- `sequence_interval_seconds`: standardpaus mellan fyrbildslägets exponeringar.
+- `gpio_flash_pin` och `flash_seconds`: GPIO-signal och blixtlängd.
 - `key_single` / `key_sequence`: tangentkommandon från Bluetoothknappen.
-- `upload_url` / `upload_token`: multipart-API för uppladdning; lämna URL tom för lokal drift.
+- `upload_url` / `upload_token`: uppladdnings-API. Jobben sparas i `~/Photobooth/upload-queue/` och försöks igen tills API:t ger 2xx.
 
-Uppladdnings-API:t förväntas ta emot multipart-fälten `image`, `session_id`, `session_name` och `idempotency_key`. Jobben ligger beständigt i `~/Photobooth/upload-queue/` och försöks igen tills API:t ger 2xx.
-
-## Säkerhet och hårdvara
-
-GPIO-pinnen är endast en styrsignal. Driv inte LED-slingan direkt från Pi:n; använd en transistor/MOSFET eller lämplig LED-styrenhet med separat strömförsörjning och gemensam jord enligt slingans specifikation. Standardinställningen håller blixten aktiv 180 ms vid varje exponering; anpassa efter vald hårdvara.
-
-## Begränsningar i provskottet
-
-- Livevyn är en återkommande stillbild från `gphoto2 --capture-preview`, inte en flytande videoström. Uppdatering och stöd beror på kameran. Om kameran inte stöder preview samtidigt med fjärrstyrning behöver den delen anpassas till kamerans liveview-läge.
-- Flaskning/sekvenstakt beror på kamerans exponering, autofokus och bildöverföring. Det här provskottet väntar på att varje fil hämtas innan nästa exponering.
-- Uppladdningsendpointen och webbappens API-kontrakt är ännu inte definierade. Prototypen köar lokalt tills `upload_url` konfigureras.
-- Sessionens grundflöde finns, men avancerad sessionskonfiguration, användarhantering och galleri hör till nästa iteration.
+Installationsskriptet ska köras som skrivbordsanvändaren eftersom det installerar en användartjänst och autostartfil i den användarens hemkatalog.

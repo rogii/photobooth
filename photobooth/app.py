@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
-"""Photobooth proof of concept for Raspberry Pi OS desktop."""
+"""Local photobooth web server for Raspberry Pi and browser based UI testing."""
 
 from __future__ import annotations
 
+import argparse
 import json
 import os
-import queue
 import shutil
 import subprocess
 import threading
@@ -13,9 +13,9 @@ import time
 import uuid
 from datetime import datetime
 from pathlib import Path
-from tkinter import END, Tk, StringVar, messagebox, ttk
 
-from PIL import Image, ImageTk, ImageOps, ImageDraw
+from flask import Flask, jsonify, request, send_file, send_from_directory
+from PIL import Image, ImageDraw, ImageOps
 
 BASE = Path(__file__).resolve().parent
 CONFIG_PATH = BASE / "config.json"
@@ -23,7 +23,8 @@ DATA = Path(os.environ.get("PHOTOBOOTH_DATA", Path.home() / "Photobooth"))
 SESSIONS = DATA / "sessions"
 UPLOAD_QUEUE = DATA / "upload-queue"
 LAST_SESSION = DATA / "last-session.json"
-PREVIEW_FILE = DATA / "preview.jpg"
+DISPLAY_FILE = DATA / "latest-display.jpg"
+NEXT_DISPLAY_FILE = DATA / "latest-display-next.jpg"
 
 
 def read_config():
@@ -33,263 +34,259 @@ def read_config():
         return {}
 
 
-class Photobooth:
-    def __init__(self, root):
-        self.root = root
+class PhotoboothService:
+    def __init__(self, demo=False):
         self.config = read_config()
-        self.root.title("Fotobås")
-        self.root.attributes("-fullscreen", True)
-        self.root.configure(background="#111827")
-        self.root.bind("<Escape>", lambda _e: self.root.attributes("-fullscreen", False))
-        self.root.bind("<KeyPress>", self.on_key)
-        self.root.protocol("WM_DELETE_WINDOW", self.close)
-        self.messages = queue.Queue()
+        self.demo = demo
         self.camera_lock = threading.Lock()
+        self.state_lock = threading.Lock()
+        self.stop_event = threading.Event()
         self.busy = False
+        self.status = "Choose or create a session"
+        self.countdown = ""
         self.session = None
-        self.preview_photo = None
+        self.last_session = self._read_last_session()
         self.flash = None
         self.flash_available = False
-        self.status = StringVar(value="Välj en session för att börja")
-        self.countdown = StringVar(value="")
-        self.event_name = StringVar()
-        self.countdown_seconds = StringVar(value=str(self.config.get("countdown_seconds", 3)))
-        self.sequence_interval = StringVar(value=str(self.config.get("sequence_interval_seconds", 0.8)))
-        self._init_gpio()
-        self._build_ui()
+        self.recent_photo = None
+        self.recent_photo_version = ""
+        self.recent_photo_time = None
+
         DATA.mkdir(parents=True, exist_ok=True)
         SESSIONS.mkdir(parents=True, exist_ok=True)
         UPLOAD_QUEUE.mkdir(parents=True, exist_ok=True)
-        threading.Thread(target=self.upload_worker, daemon=True).start()
-        self.root.after(100, self.poll_messages)
-        self.root.after(500, self.offer_session)
+        self._init_gpio()
+        threading.Thread(target=self.upload_worker, daemon=True, name="upload-queue").start()
+
+    def _read_last_session(self):
+        try:
+            value = json.loads(LAST_SESSION.read_text())
+            if (SESSIONS / value.get("id", "")).is_dir():
+                return value
+        except (OSError, json.JSONDecodeError, TypeError):
+            pass
+        return None
 
     def _init_gpio(self):
+        if self.demo:
+            return
         try:
             from gpiozero import DigitalOutputDevice
-            pin = int(self.config.get("gpio_flash_pin", 17))
-            self.flash = DigitalOutputDevice(pin, active_high=True, initial_value=False)
+            self.flash = DigitalOutputDevice(
+                int(self.config.get("gpio_flash_pin", 17)),
+                active_high=True,
+                initial_value=False,
+            )
             self.flash_available = True
         except Exception as exc:
-            print(f"GPIO-blixt avstängd: {exc}")
+            print(f"GPIO flash disabled: {exc}")
 
-    def _build_ui(self):
-        style = ttk.Style()
-        style.theme_use("clam")
-        style.configure("TButton", font=("Sans", 18), padding=12)
-        style.configure("TLabel", font=("Sans", 15))
-        top = ttk.Frame(self.root, padding=12)
-        top.pack(fill="x")
-        ttk.Label(top, text="FOTOBÅS", font=("Sans", 22, "bold")).pack(side="left")
-        ttk.Label(top, textvariable=self.status).pack(side="right")
-        body = ttk.Frame(self.root, padding=16)
-        body.pack(fill="both", expand=True)
-        self.preview = ttk.Label(body, text="Kamerans livevy visas här", anchor="center")
-        self.preview.pack(side="left", fill="both", expand=True, padx=(0, 16))
-        panel = ttk.Frame(body, padding=12)
-        panel.pack(side="right", fill="y")
-        ttk.Label(panel, text="Event").pack(anchor="w")
-        ttk.Label(panel, textvariable=self.event_name, wraplength=280, font=("Sans", 20, "bold")).pack(anchor="w", pady=(0, 16))
-        ttk.Label(panel, text="Nedräkning (sekunder)").pack(anchor="w")
-        ttk.Entry(panel, textvariable=self.countdown_seconds, font=("Sans", 18), width=8).pack(anchor="w", pady=(0, 12))
-        ttk.Label(panel, text="Intervall mellan bilder (sekunder)").pack(anchor="w")
-        ttk.Entry(panel, textvariable=self.sequence_interval, font=("Sans", 18), width=8).pack(anchor="w", pady=(0, 18))
-        ttk.Button(panel, text="Ta en bild  (A)", command=lambda: self.start_capture(1)).pack(fill="x", pady=5)
-        ttk.Button(panel, text="Ta fyra bilder  (B)", command=lambda: self.start_capture(4)).pack(fill="x", pady=5)
-        ttk.Button(panel, text="Byt / ny session", command=self.offer_session).pack(fill="x", pady=(20, 5))
-        ttk.Label(panel, textvariable=self.countdown, font=("Sans", 48, "bold")).pack(pady=12)
-        self.queue_label = ttk.Label(panel, text="")
-        self.queue_label.pack(anchor="w", pady=10)
-        self.root.after(2000, self.update_queue_label)
+    def state(self):
+        with self.state_lock:
+            session = dict(self.session) if self.session else None
+            photo_visible = bool(
+                self.recent_photo
+                and self.recent_photo_time
+                and time.monotonic() - self.recent_photo_time < 10
+            )
+            return {
+                "session": session,
+                "last_session": dict(self.last_session) if self.last_session else None,
+                "busy": self.busy,
+                "status": self.status,
+                "countdown": self.countdown,
+                "recent_photo": photo_visible,
+                "recent_photo_version": self.recent_photo_version if photo_visible else "",
+                "queued_uploads": len(list(UPLOAD_QUEUE.glob("*.json"))),
+                "flash_available": self.flash_available,
+                "demo": self.demo,
+            }
 
-    def offer_session(self):
-        previous = None
-        try:
-            previous = json.loads(LAST_SESSION.read_text())
-        except (OSError, json.JSONDecodeError):
-            pass
-        choices = []
-        if previous and (SESSIONS / previous.get("id", "")).is_dir():
-            choices.append("Återuppta senaste: " + previous.get("name", "Event"))
-        choices.append("Starta ny session")
-        choice = self.choose_dialog("Välkommen", choices)
-        if choice is None:
-            return
-        if previous and choice == choices[0] and len(choices) == 2:
-            self.session = previous
-            self.event_name.set(self.session["name"])
-            self.status.set("Session återupptagen · A = en bild · B = fyra bilder")
-            self.update_queue_label()
-            return
-        name = self.text_dialog("Ny session", "Namn på eventet:")
-        if not name:
-            return
-        now = datetime.now().strftime("%Y%m%d-%H%M%S")
-        self.session = {"id": f"{now}-{uuid.uuid4().hex[:6]}", "name": name.strip(), "created_at": datetime.now().isoformat()}
-        (SESSIONS / self.session["id"]).mkdir(parents=True, exist_ok=True)
-        LAST_SESSION.write_text(json.dumps(self.session, ensure_ascii=False, indent=2))
-        self.event_name.set(self.session["name"])
-        self.status.set("Session klar · A = en bild · B = fyra bilder")
+    def set_status(self, value):
+        with self.state_lock:
+            self.status = value
 
-    def choose_dialog(self, title, choices):
-        result = {"value": None}
-        win = self.dialog_window(title)
-        ttk.Label(win, text=title, font=("Sans", 20, "bold")).pack(padx=24, pady=16)
-        for choice in choices:
-            ttk.Button(win, text=choice, command=lambda c=choice: (result.update(value=c), win.destroy())).pack(fill="x", padx=24, pady=6)
-        ttk.Button(win, text="Avbryt", command=win.destroy).pack(fill="x", padx=24, pady=(10, 18))
-        self.root.wait_window(win)
-        return result["value"]
+    def set_countdown(self, value):
+        with self.state_lock:
+            self.countdown = value
 
-    def text_dialog(self, title, prompt):
-        result = {"value": None}
-        win = self.dialog_window(title)
-        ttk.Label(win, text=prompt, font=("Sans", 19)).pack(padx=24, pady=16)
-        entry = ttk.Entry(win, font=("Sans", 20), width=28)
-        entry.pack(padx=24, pady=8)
-        entry.focus_set()
-        def done():
-            result["value"] = entry.get()
-            win.destroy()
-        ttk.Button(win, text="Starta session", command=done).pack(fill="x", padx=24, pady=16)
-        entry.bind("<Return>", lambda _e: done())
-        self.root.wait_window(win)
-        return result["value"]
+    def create_session(self, name):
+        if not name or not name.strip():
+            raise ValueError("Enter a session name")
+        with self.state_lock:
+            if self.busy:
+                raise RuntimeError("Wait for the current capture to finish")
+            now = datetime.now()
+            self.session = {
+                "id": f"{now.strftime('%Y%m%d-%H%M%S')}-{uuid.uuid4().hex[:6]}",
+                "name": name.strip(),
+                "created_at": now.isoformat(),
+            }
+            self.last_session = dict(self.session)
+            self.status = f"Session ready · {self.session['name']}"
+            (SESSIONS / self.session["id"]).mkdir(parents=True, exist_ok=True)
+            LAST_SESSION.write_text(json.dumps(self.session, ensure_ascii=False, indent=2))
+            return dict(self.session)
 
-    def dialog_window(self, title):
-        win = __import__("tkinter").Toplevel(self.root)
-        win.title(title)
-        win.transient(self.root)
-        win.grab_set()
-        win.geometry("600x400+120+80")
-        return win
+    def resume_session(self):
+        with self.state_lock:
+            if self.busy:
+                raise RuntimeError("Wait for the current capture to finish")
+            if not self.last_session:
+                raise ValueError("There is no previous session to resume")
+            self.session = dict(self.last_session)
+            self.status = f"Session resumed · {self.session['name']}"
+            return dict(self.session)
 
-    def on_key(self, event):
-        if isinstance(event.widget, ttk.Entry):
-            return
-        key = event.char.lower()
-        if key == str(self.config.get("key_single", "a")).lower():
-            self.start_capture(1)
-        elif key == str(self.config.get("key_sequence", "b")).lower():
-            self.start_capture(4)
-
-    def start_capture(self, count):
-        if self.busy:
-            return
-        if not self.session:
-            self.status.set("Välj eller skapa en session först")
-            return
-        try:
-            delay = max(0, min(30, int(self.countdown_seconds.get())))
-            interval = max(0, min(10, float(self.sequence_interval.get())))
-        except ValueError:
-            self.status.set("Kontrollera nedräkning och intervall")
-            return
-        self.busy = True
-        threading.Thread(target=self.capture_flow, args=(count, delay, interval), daemon=True).start()
+    def start_capture(self, count, delay, interval):
+        with self.state_lock:
+            if self.busy:
+                raise RuntimeError("A capture is already running")
+            if not self.session:
+                raise RuntimeError("Choose or create a session first")
+            self.busy = True
+            self.recent_photo = None
+            self.recent_photo_version = ""
+            self.recent_photo_time = None
+            self.status = "Preparing capture"
+        threading.Thread(
+            target=self.capture_flow,
+            args=(count, delay, interval),
+            daemon=True,
+            name="photo-capture",
+        ).start()
 
     def capture_flow(self, count, delay, interval):
         try:
-            for n in range(delay, 0, -1):
-                self.messages.put(("countdown", str(n)))
+            for remaining in range(delay, 0, -1):
+                self.set_countdown(str(remaining))
                 time.sleep(1)
-            self.messages.put(("countdown", "LE") )
-            frames = []
-            for i in range(count):
+            self.set_countdown("SMILE")
+            files = []
+            for index in range(count):
                 if self.flash:
                     self.flash.on()
                     time.sleep(float(self.config.get("flash_seconds", 0.18)))
-                image_path = self.capture_one()
+                photo = self.capture_one()
                 if self.flash:
                     self.flash.off()
-                frames.append(image_path)
-                if i + 1 < count:
+                files.append(photo)
+                if index + 1 < count:
                     time.sleep(interval)
-            final_path = self.make_result(frames)
-            queued = UPLOAD_QUEUE / f"{self.session['id']}-{final_path.name}.json"
-            queued.write_text(json.dumps({"file": str(final_path), "session_id": self.session["id"], "session_name": self.session["name"], "idempotency_key": uuid.uuid4().hex}))
-            self.messages.put(("status", f"Sparad: {final_path.name}"))
+            result = self.make_result(files)
+            self.make_display_image(result)
+            session = self.session
+            queued = UPLOAD_QUEUE / f"{session['id']}-{result.name}.json"
+            queued.write_text(json.dumps({
+                "file": str(result),
+                "session_id": session["id"],
+                "session_name": session["name"],
+                "idempotency_key": uuid.uuid4().hex,
+            }))
+            with self.state_lock:
+                self.recent_photo = DISPLAY_FILE
+                self.recent_photo_version = result.name
+                self.recent_photo_time = time.monotonic()
+                self.status = f"Saved · {result.name}"
         except Exception as exc:
+            self.set_status(f"Capture failed · {exc}")
+        finally:
             if self.flash:
                 self.flash.off()
-            self.messages.put(("status", f"Fotografering misslyckades: {exc}"))
-        finally:
-            self.messages.put(("countdown", ""))
-            self.messages.put(("ready", ""))
+            self.set_countdown("")
+            with self.state_lock:
+                self.busy = False
 
     def capture_one(self):
+        session = self.session
+        folder = SESSIONS / session["id"]
+        path = folder / f"{datetime.now().strftime('%H%M%S-%f')}.jpg"
+        if self.demo:
+            self.make_demo_image(path, "DEMO CAPTURE")
+            return path
         command = self.config.get("camera_command", "gphoto2")
         if not shutil.which(command):
-            raise RuntimeError(f"Hittar inte {command}; installera gphoto2")
-        folder = SESSIONS / self.session["id"]
-        path = folder / f"{datetime.now().strftime('%H%M%S-%f')}.jpg"
+            raise RuntimeError(f"Cannot find {command}; install gPhoto2")
         with self.camera_lock:
-            result = subprocess.run([command, "--capture-image-and-download", "--filename", str(path)], capture_output=True, text=True, timeout=90)
+            result = subprocess.run(
+                [command, "--capture-image-and-download", "--filename", str(path)],
+                capture_output=True,
+                text=True,
+                timeout=90,
+            )
         if result.returncode != 0 or not path.exists():
-            raise RuntimeError((result.stderr or result.stdout or "Kameran returnerade inget foto").strip()[-400:])
+            raise RuntimeError((result.stderr or result.stdout or "Camera returned no photo").strip()[-400:])
+        self.normalize_photo(path)
         return path
+
+    def normalize_photo(self, path):
+        """Crop a capture to 16:9 and save it in the same JPEG file."""
+        with Image.open(path) as source:
+            image = ImageOps.exif_transpose(source).convert("RGB")
+        width, height = image.size
+        target_ratio = 16 / 9
+        if width / height > target_ratio:
+            crop_width = round(height * target_ratio)
+            left = (width - crop_width) // 2
+            image = image.crop((left, 0, left + crop_width, height))
+        else:
+            crop_height = round(width / target_ratio)
+            top = (height - crop_height) // 2
+            image = image.crop((0, top, width, top + crop_height))
+        image.save(path, format="JPEG", quality=94, optimize=True)
 
     def make_result(self, frames):
         if len(frames) == 1:
             return frames[0]
-        images = [ImageOps.exif_transpose(Image.open(p)).convert("RGB") for p in frames]
-        tile_w, tile_h = 1200, 900
+        images = []
+        for path in frames:
+            with Image.open(path) as source:
+                images.append(ImageOps.exif_transpose(source).convert("RGB"))
+        tile_w, tile_h = 1200, 675
         canvas = Image.new("RGB", (tile_w * 2, tile_h * 2), "white")
-        for i, image in enumerate(images):
-            image.thumbnail((tile_w - 24, tile_h - 24))
-            x = (i % 2) * tile_w + (tile_w - image.width) // 2
-            y = (i // 2) * tile_h + (tile_h - image.height) // 2
+        for index, image in enumerate(images):
+            image = ImageOps.fit(image, (tile_w, tile_h), method=Image.Resampling.LANCZOS)
+            x = (index % 2) * tile_w
+            y = (index // 2) * tile_h
             canvas.paste(image, (x, y))
-        out = SESSIONS / self.session["id"] / f"{datetime.now().strftime('%H%M%S-%f')}-strip.jpg"
-        canvas.save(out, quality=92)
-        return out
+        output = SESSIONS / self.session["id"] / f"{datetime.now().strftime('%H%M%S-%f')}-strip.jpg"
+        canvas.save(output, quality=92)
+        return output
 
-    def preview_tick(self):
-        # Preview is a still-frame poll; gPhoto2 camera support/latency varies by model.
-        if self.session and not self.busy and self.camera_lock.acquire(blocking=False):
-            def fetch():
-                try:
-                    result = subprocess.run([self.config.get("camera_command", "gphoto2"), "--capture-preview", "--filename", str(PREVIEW_FILE), "--force-overwrite"], capture_output=True, timeout=15)
-                    if result.returncode == 0 and PREVIEW_FILE.exists():
-                        self.messages.put(("preview", str(PREVIEW_FILE)))
-                except Exception:
-                    pass
-                finally:
-                    self.camera_lock.release()
-            threading.Thread(target=fetch, daemon=True).start()
-        self.root.after(int(self.config.get("preview_interval_ms", 1200)), self.preview_tick)
+    def make_display_image(self, path):
+        """Create a lightweight screen copy while preserving the original capture."""
+        with Image.open(path) as source:
+            image = ImageOps.exif_transpose(source).convert("RGB")
+        image.thumbnail((1600, 1000), Image.Resampling.LANCZOS)
+        image.save(NEXT_DISPLAY_FILE, format="JPEG", quality=86, optimize=True)
+        NEXT_DISPLAY_FILE.replace(DISPLAY_FILE)
 
-    def poll_messages(self):
-        try:
-            while True:
-                kind, value = self.messages.get_nowait()
-                if kind == "countdown": self.countdown.set(value)
-                elif kind == "status": self.status.set(value)
-                elif kind == "ready": self.busy = False
-                elif kind == "preview":
-                    image = Image.open(value)
-                    image.thumbnail((1000, 760))
-                    self.preview_photo = ImageTk.PhotoImage(image)
-                    self.preview.configure(image=self.preview_photo, text="")
-        except queue.Empty:
-            pass
-        self.root.after(100, self.poll_messages)
+    def make_demo_image(self, path, label):
+        width, height = 1600, 900
+        image = Image.new("RGB", (width, height), (27, 37, 44))
+        draw = ImageDraw.Draw(image)
+        draw.ellipse((width * .58, -height * .22, width * 1.04, height * .62), fill=(45, 74, 76))
+        draw.ellipse((width * .1, height * .35, width * .9, height * 1.4), fill=(76, 77, 69))
+        draw.ellipse((width * .38, height * .13, width * .62, height * .52), fill=(203, 161, 124))
+        draw.rounded_rectangle((width * .24, height * .48, width * .76, height * 1.2), radius=180, fill=(55, 91, 92))
+        draw.rounded_rectangle((28, 28, 395, 90), radius=18, fill=(12, 21, 27))
+        draw.text((52, 48), label, fill=(238, 229, 211))
+        image.save(path, format="JPEG", quality=88)
 
     def upload_worker(self):
-        while True:
+        while not self.stop_event.is_set():
             endpoint = self.config.get("upload_url", "").strip()
             if endpoint:
                 for job in list(UPLOAD_QUEUE.glob("*.json")):
                     try:
                         import urllib.request
-                        import urllib.error
                         meta = json.loads(job.read_text())
                         image_path = Path(meta["file"])
                         boundary = uuid.uuid4().hex
-                        fields = {k: str(meta[k]) for k in ("session_id", "session_name", "idempotency_key")}
+                        fields = {key: str(meta[key]) for key in ("session_id", "session_name", "idempotency_key")}
                         chunks = []
-                        for key, val in fields.items():
-                            chunks.append(f"--{boundary}\r\nContent-Disposition: form-data; name=\"{key}\"\r\n\r\n{val}\r\n".encode())
+                        for key, value in fields.items():
+                            chunks.append(f"--{boundary}\r\nContent-Disposition: form-data; name=\"{key}\"\r\n\r\n{value}\r\n".encode())
                         chunks.append(f"--{boundary}\r\nContent-Disposition: form-data; name=\"image\"; filename=\"{image_path.name}\"\r\nContent-Type: image/jpeg\r\n\r\n".encode())
                         chunks.append(image_path.read_bytes())
                         chunks.append(f"\r\n--{boundary}--\r\n".encode())
@@ -301,28 +298,98 @@ class Photobooth:
                             if 200 <= response.status < 300:
                                 job.unlink(missing_ok=True)
                     except Exception as exc:
-                        print(f"Uppladdning väntar på återförsök ({job.name}): {exc}")
-                        time.sleep(2)
-            time.sleep(10)
-
-    def update_queue_label(self):
-        UPLOAD_QUEUE.mkdir(parents=True, exist_ok=True)
-        self.queue_label.configure(text=f"Väntande uppladdningar: {len(list(UPLOAD_QUEUE.glob('*.json')))}\nBlixt: {'redo' if self.flash_available else 'ej ansluten'}")
-        self.root.after(5000, self.update_queue_label)
+                        print(f"Upload retry pending ({job.name}): {exc}")
+                        self.stop_event.wait(2)
+            self.stop_event.wait(10)
 
     def close(self):
+        self.stop_event.set()
         if self.flash:
             self.flash.off()
             self.flash.close()
-        self.root.destroy()
+        if self.camera_lock.acquire(timeout=20):
+            self.camera_lock.release()
+
+
+def create_app(service):
+    web = Flask(__name__, static_folder="static", static_url_path="/static")
+
+    @web.get("/")
+    def index():
+        return send_from_directory(BASE / "static", "index.html")
+
+    @web.get("/api/state")
+    def get_state():
+        return jsonify(service.state())
+
+    @web.get("/api/recent-photo")
+    def recent_photo():
+        state = service.state()
+        path = service.recent_photo
+        if not state["recent_photo"] or not path or not path.is_file():
+            return "No captured photo", 404
+        response = send_file(path, mimetype="image/jpeg", max_age=0, conditional=False)
+        response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate"
+        return response
+
+    @web.post("/api/session")
+    def create_session():
+        payload = request.get_json(silent=True) or {}
+        try:
+            session = service.create_session(str(payload.get("name", "")))
+            return jsonify({"session": session}), 201
+        except (ValueError, RuntimeError) as exc:
+            return jsonify({"error": str(exc)}), 400
+
+    @web.post("/api/session/resume")
+    def resume_session():
+        try:
+            return jsonify({"session": service.resume_session()})
+        except (ValueError, RuntimeError) as exc:
+            return jsonify({"error": str(exc)}), 400
+
+    @web.post("/api/capture")
+    def capture():
+        payload = request.get_json(silent=True) or {}
+        try:
+            count = int(payload.get("count", 1))
+            delay = max(0, min(30, int(payload.get("countdown", service.config.get("countdown_seconds", 3)))))
+            interval = max(0, min(10, float(payload.get("interval", service.config.get("sequence_interval_seconds", 0.8)))))
+            if count not in (1, 4):
+                raise ValueError("Capture count must be one or four")
+            service.start_capture(count, delay, interval)
+            return jsonify({"started": True}), 202
+        except (ValueError, RuntimeError) as exc:
+            return jsonify({"error": str(exc)}), 400
+
+    @web.post("/api/restart")
+    def restart_app():
+        service.stop_event.set()
+        if service.flash:
+            service.flash.off()
+        shutdown = web.config.get("shutdown_server")
+        if shutdown:
+            threading.Timer(0.3, shutdown).start()
+        return jsonify({"restarting": True})
+
+    return web
 
 
 def main():
-    DATA.mkdir(parents=True, exist_ok=True)
-    root = Tk()
-    app = Photobooth(root)
-    root.after(1500, app.preview_tick)
-    root.mainloop()
+    parser = argparse.ArgumentParser(description="Run the local photobooth web UI")
+    parser.add_argument("--host", default="127.0.0.1")
+    parser.add_argument("--port", type=int, default=8080)
+    parser.add_argument("--demo", action="store_true", help="Use generated images instead of camera and GPIO")
+    args = parser.parse_args()
+    service = PhotoboothService(demo=args.demo)
+    from werkzeug.serving import make_server
+    web = create_app(service)
+    server = make_server(args.host, args.port, web, threaded=True)
+    web.config["shutdown_server"] = server.shutdown
+    try:
+        server.serve_forever()
+    finally:
+        service.close()
 
 
 if __name__ == "__main__":

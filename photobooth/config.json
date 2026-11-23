@@ -6,7 +6,6 @@
   "countdown_seconds": 3,
   "sequence_interval_seconds": 0.8,
   "flash_seconds": 0.18,
-  "preview_interval_ms": 1200,
   "key_single": "a",
   "key_sequence": "b"
 }
