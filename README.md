@@ -1,5 +1,5 @@
 # photobooth
 
-Fotobåset finns i [`photobooth/`](photobooth/). Projektet riktar sig till Raspberry Pi med Raspberry Pi OS Desktop och har testats framgångsrikt på Raspberry Pi 5. Det är en lokal Flask-webbapp som körs som en systemd-användartjänst med Chromium kiosk-gränssnitt, gPhoto2-kamerastyrning, Bluetoothknapp, GPIO-blixt, fyrbildskollage och beständig uppladdningskö.
+The photobooth application is in [`photobooth/`](photobooth/). The project targets Raspberry Pi with Raspberry Pi OS Desktop and has been successfully tested on Raspberry Pi 5. It is a local Flask web app that runs as a systemd user service with a Chromium kiosk interface, gPhoto2 camera control, a Bluetooth button, a GPIO flash, four-photo collages, and a persistent upload queue.
 
-Bilder sparas lokalt per event. Kiosken visar en sorterad bildvägg i viloläge och växlar till nedräkning, sparförlopp och helskärmsresultat vid fotografering. Adminpanelen körs på en separat port för status, inställningar och omstart. Se [`photobooth/README.md`](photobooth/README.md) för lokal demokörning, installation och kiosk-autostart.
+Photos are stored locally for each event. The kiosk shows a sorted photo wall while idle, then switches to a countdown, save progress, and a full-screen result when taking a photo. The admin panel runs on a separate port for status, settings, and restarting the service. See [`photobooth/README.md`](photobooth/README.md) for running the local demo, installation, and kiosk autostart.
