@@ -1,6 +1,6 @@
 # Raspberry Pi fotobås
 
-Fotobåset körs som en lokal Flask-webbapp i Chromium kiosk mode. Gränssnittet är vanlig HTML, CSS och JavaScript, så det går att prova och ändra i en vanlig webbläsare utan Raspberry Pi eller kamera.
+Fotobåset är avsett att köras på Raspberry Pi med Raspberry Pi OS Desktop. Installationen har testats framgångsrikt på en Raspberry Pi 5. Appen använder Flask, Chromium i kiosk-läge, gPhoto2 för kameran och GPIO för blixten. Webbgränssnittet kan även provas i demoläge på en vanlig dator.
 
 ## Prova gränssnittet lokalt
 
@@ -12,11 +12,11 @@ python3 -m venv .venv
 .venv/bin/python app.py --demo
 ```
 
-Öppna kioskvisningen på [http://127.0.0.1:8080](http://127.0.0.1:8080) och adminpanelen på [http://127.0.0.1:8081](http://127.0.0.1:8081) eller `/admin`. Demoläget skapar exempelbilder och låtsasfoton utan kamera eller GPIO. Det går även att visa webbsidan från en annan dator på samma nätverk genom att starta servern med `--host 0.0.0.0`; använd Pi:ns eller datorns IP-adress på port 8080 för kiosken och port 8081 för adminpanelen.
+Öppna kiosken på `localhost:8080` och den vanliga adminpanelen på `localhost:8081`. Demoläget skapar exempelbilder utan kamera eller GPIO.
 
-## Raspberry Pi kiosk
+## Installera på Raspberry Pi
 
-Kör på Raspberry Pi OS Desktop:
+Använd Raspberry Pi OS Desktop. Aktivera automatisk inloggning till skrivbordet om kiosken ska starta efter omstart. Kör från projektmappen:
 
 ```sh
 cd photobooth
@@ -24,34 +24,24 @@ chmod +x install.sh launch-kiosk.sh
 ./install.sh
 ```
 
-Installationsskriptet installerar Python, Flask, gPhoto2 och Chromium, skapar `.venv`, installerar en `systemd --user`-tjänst och lägger Chromium kiosk i skrivbordets autostart. Det lägger även till en begränsad sudoers-regel som låter appen stänga av Pi:n med `systemctl poweroff`. Kör skriptet som skrivbordsanvändaren, utan `sudo`. För autostart efter omstart ska Raspberry Pi OS starta till skrivbordet med automatisk inloggning (`sudo raspi-config` → System Options → Boot / Auto Login → Desktop Autologin).
+Kör installationsskriptet som skrivbordsanvändaren, inte som root. Skriptet installerar beroenden, skapar den virtuella Python-miljön, installerar en `systemd --user`-tjänst och lägger Chromium i skrivbordets autostart. Det använder `sudo` för systempaket och för en begränsad regel som tillåter appen att köra `systemctl poweroff`.
 
-Starta om webbservern över SSH eller från terminalen:
+Kiosken öppnas lokalt på port 8080. Den vanliga adminpanelen använder port 8081.
+
+Starta om tjänsten och visa dess status eller loggar med:
 
 ```sh
 systemctl --user restart photobooth.service
+systemctl --user status photobooth.service
+journalctl --user -u photobooth.service -f
 ```
 
-Visa status och loggar med `systemctl --user status photobooth.service` och `journalctl --user -u photobooth.service -f`. Chromium ligger kvar öppet och ansluter igen efter omstarten.
-
-Kameran ansluts via USB. Kontrollera anslutningen från terminalen:
+Chromium ansluter igen när tjänsten har startats om. Kameran ansluts via USB. Kontrollera kameran med:
 
 ```sh
 gphoto2 --auto-detect
 gphoto2 --capture-preview --filename /tmp/preview.jpg
 ```
-
-På Raspberry Pi OS använder kioskstartaren Chromium i helskärmsläge på `http://127.0.0.1:8080`. Servern lyssnar även på nätverksgränssnitten så en annan dator på samma nät kan öppna Pi:ns adress på port 8080 för kiosken eller 8081/admin för administration.
-
-## Anslutning till befintlig Pi
-
-- SSH-värd: `10.66.25.48`
-- SSH-användare: `jonas`
-- Klonad repo: `/home/jonas/photobooth`
-- Appkatalog som tjänsten kör från: `/home/jonas/photobooth/photobooth`
-- Tjänst: `photobooth.service` (systemd user service)
-
-Anslut med `ssh jonas@10.66.25.48`. Synka projektets `photobooth/`-katalog till samma sökväg under klonens rot, med relativa sökvägar bevarade, så att appens `static/`-filer hamnar i appkatalogens `static/`. Starta sedan om tjänsten med `systemctl --user restart photobooth.service` och kontrollera den med `systemctl --user status photobooth.service`.
 
 ## Funktioner
 
@@ -59,7 +49,7 @@ Anslut med `ssh jonas@10.66.25.48`. Synka projektets `photobooth/`-katalog till 
 - Kioskens viloläge visar de senaste bilderna från aktiv session i en kolumninställbar bildvägg, nyast överst till vänster. Bildrutorna behåller bildens bildförhållande och den nedersta raden beskärs av skärmkanten. Under fotograferingen visas nedräkning och kamerans exponering. När nedräkningen når noll ligger "SMILE" kvar med information om att fotot fångas och laddas ned från kameran. För fyrbildssekvensen visas aktuell bild (1/4–4/4) med separat inställbar nedräkning inför varje bild. Resultatet visas så snart kamerafångst och bildbehandling är klara, utan en extra simulerad nedladdningsvy. En nedräkning på 0 utelämnar nedräkningen och "SMILE"-pausen.
 - En ny fotografering kan startas direkt från resultatbilden med `A` (en bild) eller `B` (fyra bilder). Annars återgår kiosken efter den konfigurerade visningstiden.
 - Kiosken på port 8080 visar vid start en lista över sparade, synliga sessioner, nyast först, eller låter dig skapa en ny session med skärmtangentbordet. Den vanliga adminpanelen på port 8081 behåller sina befintliga funktioner för sessioner, fångst, inställningar och ZIP-nedladdning. En separat lokal admin öppnas från kiosken genom att hålla på internetstatusen i sidfoten och ange PIN-koden (standard `1234`). Där kan foton förhandsgranskas, flyttas till en `deleted/`-mapp utan att tas bort permanent, och Raspberry Pi:n stängas av. Flyttade foton döljs från galleriet och räknaren men följer med i sessions-ZIP:en. PIN-koden ändras i den lokala adminsidan. En session kan fästas på displayen så den återställs efter omstart och kiosken hoppar över valdialogen. Att avfästa eller stoppa sessionen återför kiosken direkt till sessionsvalet. Kioskens bildvägg visar internetstatus i sidfoten.
-- GPIO-blixt med standard BCM 17. Driv inte LED-slingor direkt från Pi:n; använd lämplig transistor/MOSFET eller LED-styrenhet och separat strömförsörjning.
+- GPIO-blixten kan konfigureras efter installationens hårdvara. Driv inte LED-slingor direkt från Pi:n; använd lämplig transistor/MOSFET eller LED-styrenhet och separat strömförsörjning.
 - Beständig lokal uppladdningskö. `upload_url` och `upload_token` i `config.json` styr multipart-uppladdning.
 
 ## Inställningar
