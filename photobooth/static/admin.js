@@ -16,18 +16,6 @@ function say(message) {
   $("#message").textContent = message;
 }
 
-const kioskUrl = new URL(window.location.href);
-kioskUrl.port = "8080";
-kioskUrl.pathname = "/";
-kioskUrl.search = "";
-kioskUrl.hash = "";
-const returnLink = document.createElement("a");
-returnLink.href = kioskUrl.toString();
-returnLink.textContent = "← Return to kiosk";
-returnLink.style.display = "inline-block";
-returnLink.style.marginBottom = "10px";
-$(".wrap > h1").insertAdjacentElement("afterend", returnLink);
-
 async function refresh() {
   try {
     const state = await api("/api/admin/state");

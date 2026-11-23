@@ -24,7 +24,7 @@ function showAdminPin() {
 function openAdminPanel() {
   const adminUrl = new URL(window.location.href);
   adminUrl.port = "8081";
-  adminUrl.pathname = "/admin";
+  adminUrl.pathname = "/local-admin";
   adminUrl.search = "";
   adminUrl.hash = "";
   window.location.assign(adminUrl.toString());
