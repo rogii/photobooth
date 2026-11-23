@@ -1,0 +1,12 @@
+{
+  "camera_command": "gphoto2",
+  "upload_url": "",
+  "upload_token": "",
+  "gpio_flash_pin": 17,
+  "countdown_seconds": 3,
+  "sequence_interval_seconds": 0.8,
+  "flash_seconds": 0.18,
+  "preview_interval_ms": 1200,
+  "key_single": "a",
+  "key_sequence": "b"
+}
