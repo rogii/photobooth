@@ -11,5 +11,5 @@
   "key_sequence": "b",
   "result_timeout_seconds": 8,
   "sequence_countdown_seconds": 2,
-  "idle_gallery_columns": 3
+  "idle_photo_wall_columns": 3
 }

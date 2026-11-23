@@ -47,6 +47,7 @@ class PhotoboothService:
         self.config = read_config()
         self.config.setdefault("capture_lead_seconds", 1.2)
         self.config.setdefault("admin_pin", "1234")
+        self.config.setdefault("idle_photo_wall_columns", 3)
         self.demo = demo
         self.camera_lock = threading.Lock()
         self.state_lock = threading.Lock()
@@ -69,7 +70,7 @@ class PhotoboothService:
         self.phase = "idle"
         self.photo_number = 0
         self.photo_total = 0
-        self.gallery_revision = 0
+        self.photo_wall_revision = 0
         self.capture_generation = 0
         self.host_info_lock = threading.Lock()
         self.internet_checked_at = 0.0
@@ -209,7 +210,7 @@ class PhotoboothService:
                 self.session = session
                 self.last_session = dict(session)
                 LAST_SESSION.write_text(json.dumps(session, ensure_ascii=False, indent=2))
-            self.gallery_revision += 1
+            self.photo_wall_revision += 1
             return session
 
     def make_overlaid_photo(self, photo, session):
@@ -374,7 +375,7 @@ class PhotoboothService:
                 shutil.move(str(source), str(destination))
                 moved += 1
             if moved:
-                self.gallery_revision += 1
+                self.photo_wall_revision += 1
         return moved
 
     def _init_gpio(self):
@@ -401,6 +402,8 @@ class PhotoboothService:
                 and self.recent_photo_time
                 and self.phase == "result"
             )
+            photo_wall_version = f"{session['id'] if session else 'none'}:{self.photo_wall_revision}"
+            photo_wall_columns = max(1, min(12, int(self.config.get("idle_photo_wall_columns", 3))))
             return {
                 "session": session,
                 "last_session": dict(self.last_session) if self.last_session else None,
@@ -412,18 +415,19 @@ class PhotoboothService:
                 "recent_photo": photo_visible,
                 "recent_photo_version": self.recent_photo_version if photo_visible else "",
                 "queued_uploads": len(list(UPLOAD_QUEUE.glob("*.json"))),
+                "gallery_upload_configured": bool(self.config.get("upload_url", "").strip()),
                 "capture_count": capture_count,
                 "flash_available": self.flash_available,
                 "demo": self.demo,
                 "phase": self.phase,
                 "photo_number": self.photo_number,
                 "photo_total": self.photo_total,
-                "gallery_version": f"{session['id'] if session else 'none'}:{self.gallery_revision}",
-                "gallery_columns": max(1, min(12, int(self.config.get("idle_gallery_columns", 3)))),
+                "photo_wall_version": photo_wall_version,
+                "photo_wall_columns": photo_wall_columns,
                 "host_info": self.host_info(),
             }
 
-    def gallery(self, rows=3):
+    def photo_wall(self, rows=3):
         event = self.session
         if not event:
             return []
@@ -431,7 +435,7 @@ class PhotoboothService:
         if not folder.is_dir():
             return []
         files = sorted(folder.glob("*.jpg"), key=lambda path: path.name, reverse=True)
-        columns = max(1, min(12, int(self.config.get("idle_gallery_columns", 3))))
+        columns = max(1, min(12, int(self.config.get("idle_photo_wall_columns", 3))))
         files = files[:columns * max(1, min(12, int(rows)))]
         overlay = self.session_overlay_path(event)
         result = []
@@ -456,7 +460,7 @@ class PhotoboothService:
             if not admin_pin.isdigit() or not 4 <= len(admin_pin) <= 12:
                 raise ValueError("Admin PIN must contain 4 to 12 digits")
         previous_gpio_pin = self.config.get("gpio_flash_pin", 17)
-        allowed = {"countdown_seconds": (0, 30, int), "sequence_countdown_seconds": (0, 30, int), "capture_lead_seconds": (0, 5, float), "sequence_interval_seconds": (0, 10, float), "idle_gallery_columns": (1, 12, int), "result_timeout_seconds": (1, 300, int), "gpio_flash_pin": (0, 27, int), "flash_seconds": (0, 5, float)}
+        allowed = {"countdown_seconds": (0, 30, int), "sequence_countdown_seconds": (0, 30, int), "capture_lead_seconds": (0, 5, float), "sequence_interval_seconds": (0, 10, float), "idle_photo_wall_columns": (1, 12, int), "result_timeout_seconds": (1, 300, int), "gpio_flash_pin": (0, 27, int), "flash_seconds": (0, 5, float)}
         for key, (low, high, cast) in allowed.items():
             if key in values:
                 self.config[key] = max(low, min(high, cast(values[key])))
@@ -622,7 +626,7 @@ class PhotoboothService:
                             if self.flash:
                                 self.flash.on()
                                 time.sleep(float(self.config.get("flash_seconds", 0.18)))
-                            capture_result["photo"] = self.capture_one(gallery_visible=(count == 1))
+                            capture_result["photo"] = self.capture_one(photo_wall_visible=(count == 1))
                         except Exception as exc:
                             capture_result["error"] = exc
                         finally:
@@ -680,7 +684,7 @@ class PhotoboothService:
                 shutil.copy2(result, stored)
                 result = stored
             with self.state_lock:
-                self.gallery_revision += 1
+                self.photo_wall_revision += 1
             session = self.session
             display_result = self.make_overlaid_photo(result, session)
             self.make_display_image(display_result)
@@ -717,10 +721,10 @@ class PhotoboothService:
                     self.photo_number = 0
                     self.photo_total = 0
 
-    def capture_one(self, gallery_visible=True):
+    def capture_one(self, photo_wall_visible=True):
         session = self.session
         folder = self.session_photo_dir(session)
-        if not gallery_visible:
+        if not photo_wall_visible:
             folder = folder / "singles"
         folder.mkdir(parents=True, exist_ok=True)
         path = folder / f"{datetime.now().strftime('%Y%m%d-%H%M%S-%f')}.jpg"
@@ -879,7 +883,7 @@ def create_app(service, admin_port=ADMIN_PORT):
     def get_admin_state():
         result = service.state()
         result["sessions"] = service.list_sessions(include_hidden=True)
-        result["config"] = {key: service.config.get(key, "") for key in ("countdown_seconds", "sequence_countdown_seconds", "capture_lead_seconds", "sequence_interval_seconds", "idle_gallery_columns", "result_timeout_seconds", "camera_command", "upload_url", "gpio_flash_pin", "flash_seconds", "key_single", "key_sequence")}
+        result["config"] = {key: service.config.get(key, "") for key in ("countdown_seconds", "sequence_countdown_seconds", "capture_lead_seconds", "sequence_interval_seconds", "idle_photo_wall_columns", "result_timeout_seconds", "camera_command", "upload_url", "gpio_flash_pin", "flash_seconds", "key_single", "key_sequence")}
         return jsonify(result)
 
     @web.get("/api/local-admin/photos")
@@ -1008,15 +1012,15 @@ def create_app(service, admin_port=ADMIN_PORT):
     def photo_file(event, filename):
         return send_from_directory(DATA / event, filename)
 
-    @web.get("/api/gallery")
-    def gallery():
+    @web.get("/api/photo-wall")
+    def photo_wall():
         try:
             rows = max(1, min(12, int(request.args.get("rows", 3))))
         except ValueError:
             rows = 3
         return jsonify({
-            "photos": service.gallery(rows),
-            "columns": max(1, min(12, int(service.config.get("idle_gallery_columns", 3)))),
+            "photos": service.photo_wall(rows),
+            "columns": max(1, min(12, int(service.config.get("idle_photo_wall_columns", 3)))),
         })
 
     @web.post("/api/config")
@@ -1030,7 +1034,7 @@ def create_app(service, admin_port=ADMIN_PORT):
     @web.get("/api/state")
     def get_state():
         state = service.state()
-        public = {key: state[key] for key in ("session", "busy", "status", "countdown", "photo_number", "photo_total", "recent_photo", "recent_photo_version", "phase", "gallery_version", "gallery_columns", "capture_count", "queued_uploads", "sessions", "locked_session", "host_info")}
+        public = {key: state[key] for key in ("session", "busy", "status", "countdown", "photo_number", "photo_total", "recent_photo", "recent_photo_version", "phase", "photo_wall_version", "photo_wall_columns", "capture_count", "queued_uploads", "gallery_upload_configured", "sessions", "locked_session", "host_info")}
         public["server_instance_id"] = SERVER_INSTANCE_ID
         public["keys"] = {"single": service.config.get("key_single", "a"), "sequence": service.config.get("key_sequence", "b")}
         return jsonify(public)

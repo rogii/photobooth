@@ -3,11 +3,11 @@ let state = null;
 let connected = false;
 let serverInstanceId = null;
 let lastVersion = "";
-let galleryVersion = null;
-let galleryRows = null;
-let galleryPhotos = [];
-let galleryRequest = false;
-let galleryLayout = "";
+let photoWallVersion = null;
+let photoWallRows = null;
+let photoWallPhotos = [];
+let photoWallRequest = false;
+let photoWallLayout = "";
 let pickerOpen = false;
 let capsLock = false;
 let adminHoldTimer = null;
@@ -60,19 +60,22 @@ function render(current) {
   $("#event-footer").classList.toggle("hidden", !current.session || current.phase === "result");
   $("#capture-count").textContent = Number(current.capture_count || 0).toLocaleString();
   const queuedUploads = Number(current.queued_uploads || 0);
+  const galleryUploadConfigured = !!current.gallery_upload_configured;
   $("#upload-indicator").classList.toggle("pending", queuedUploads > 0);
-  $("#upload-status").textContent = queuedUploads > 0 ? "UPLOADS PENDING" : "ALL UPLOADED";
+  $("#upload-status").textContent = !galleryUploadConfigured
+    ? "GALLERY UPLOAD OFF"
+    : queuedUploads > 0 ? "GALLERY UPLOADS PENDING" : "GALLERY UP TO DATE";
   $("#upload-count").textContent = queuedUploads > 0 ? `${queuedUploads} queued` : "";
   const online = !!current.host_info?.internet_connected;
   $("#internet-status").textContent = online ? "ONLINE" : "OFFLINE";
   $("#internet-indicator").classList.toggle("offline", !online);
-  const gallery = $("#gallery");
+  const photoWall = $("#photo-wall");
   const overlay = $("#overlay");
-  renderGallery();
+  renderPhotoWall();
 
   const activePhases = ["countdown", "capturing", "result"];
   $("#empty").classList.toggle("hidden", !!current.session);
-  gallery.classList.toggle("hidden", !current.session || current.phase !== "idle");
+  photoWall.classList.toggle("hidden", !current.session || current.phase !== "idle");
   overlay.classList.toggle("hidden", !activePhases.includes(current.phase));
   $("#photo-position").classList.toggle("hidden", current.phase === "result" || current.photo_total < 2);
   $("#photo-position").textContent = current.photo_total > 1
@@ -196,46 +199,46 @@ function setConnectionStatus(isConnected) {
 }
 
 
-function renderGallery() {
+function renderPhotoWall() {
   if (!state) return;
-  const gallery = $("#gallery");
-  const columns = Math.max(1, Number(state.gallery_columns) || 3);
-  const layout = `${columns}:${galleryPhotos.map((photo) => photo.name).join("|")}`;
-  if (layout === galleryLayout) return;
-  galleryLayout = layout;
-  gallery.replaceChildren();
-  gallery.style.gridTemplateColumns = `repeat(${columns},minmax(0,1fr))`;
-  gallery.style.gridTemplateRows = "none";
-  gallery.style.gridAutoRows = `${window.innerWidth / columns * 9 / 16}px`;
-  galleryPhotos.forEach((photo, index) => {
+  const photoWall = $("#photo-wall");
+  const columns = Math.max(1, Number(state.photo_wall_columns) || 3);
+  const layout = `${columns}:${photoWallPhotos.map((photo) => photo.name).join("|")}`;
+  if (layout === photoWallLayout) return;
+  photoWallLayout = layout;
+  photoWall.replaceChildren();
+  photoWall.style.gridTemplateColumns = `repeat(${columns},minmax(0,1fr))`;
+  photoWall.style.gridTemplateRows = "none";
+  photoWall.style.gridAutoRows = `${window.innerWidth / columns * 9 / 16}px`;
+  photoWallPhotos.forEach((photo, index) => {
     const image = new Image();
     image.src = `${photo.url}?v=${encodeURIComponent(photo.name)}`;
     image.alt = `Photo ${index + 1}`;
-    gallery.append(image);
+    photoWall.append(image);
   });
 }
 
-async function updateGallery() {
-  const version = state?.gallery_version;
-  const columns = Math.max(1, Number(state?.gallery_columns) || 3);
+async function updatePhotoWall() {
+  const version = state?.photo_wall_version;
+  const columns = Math.max(1, Number(state?.photo_wall_columns) || 3);
   const tileHeight = window.innerWidth / columns * 9 / 16;
   const rows = Math.max(1, Math.min(12, Math.ceil(window.innerHeight / tileHeight)));
-  if (!version || (version === galleryVersion && rows === galleryRows) || galleryRequest) return;
-  galleryRequest = true;
+  if (!version || (version === photoWallVersion && rows === photoWallRows) || photoWallRequest) return;
+  photoWallRequest = true;
   try {
-    const data = await api(`/api/gallery?rows=${rows}`);
-    if (state?.gallery_version === version) {
-      galleryPhotos = data.photos || [];
-      galleryVersion = version;
-      galleryRows = rows;
-      renderGallery();
+    const data = await api(`/api/photo-wall?rows=${rows}`);
+    if (state?.photo_wall_version === version) {
+      photoWallPhotos = data.photos || [];
+      photoWallVersion = version;
+      photoWallRows = rows;
+      renderPhotoWall();
     }
   } catch (error) {
     $("#error").textContent = error.message;
   } finally {
-    galleryRequest = false;
-    const currentRows = Math.max(1, Math.min(12, Math.ceil(window.innerHeight / (window.innerWidth / Math.max(1, Number(state?.gallery_columns) || 3) * 9 / 16))));
-    if (state?.gallery_version !== galleryVersion || currentRows !== galleryRows) updateGallery();
+    photoWallRequest = false;
+    const currentRows = Math.max(1, Math.min(12, Math.ceil(window.innerHeight / (window.innerWidth / Math.max(1, Number(state?.photo_wall_columns) || 3) * 9 / 16))));
+    if (state?.photo_wall_version !== photoWallVersion || currentRows !== photoWallRows) updatePhotoWall();
   }
 }
 
@@ -249,7 +252,7 @@ async function refresh() {
     serverInstanceId = current.server_instance_id ?? serverInstanceId;
     setConnectionStatus(true);
     render(current);
-    updateGallery();
+    updatePhotoWall();
   } catch (error) {
     setConnectionStatus(false);
     $("#error").textContent = error.message;
@@ -281,9 +284,9 @@ $("#back-to-sessions").addEventListener("click", returnToSessionOptions);
 $("#create-session").addEventListener("click", createSession);
 setInterval(refresh, 250);
 window.addEventListener("resize", () => {
-  galleryLayout = "";
-  renderGallery();
-  updateGallery();
+  photoWallLayout = "";
+  renderPhotoWall();
+  updatePhotoWall();
 });
 
 const adminAccess = $("#admin-access");

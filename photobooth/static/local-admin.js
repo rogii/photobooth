@@ -90,7 +90,7 @@ $("#session-filter").addEventListener("change", refreshPhotos);
 $("#refresh").addEventListener("click", refreshPhotos);
 $("#delete-selected").addEventListener("click", async () => {
   const selected = [...$("#photo-grid").querySelectorAll("input[type=checkbox]:checked")];
-  if (!selected.length || !confirm(`Move ${selected.length} selected photo${selected.length === 1 ? "" : "s"} into the Deleted folder? They will disappear from the kiosk gallery and capture count, but remain in session ZIP downloads.`)) return;
+  if (!selected.length || !confirm(`Move ${selected.length} selected photo${selected.length === 1 ? "" : "s"} into the Deleted folder? They will disappear from the kiosk Photo Wall and capture count, but remain in session ZIP downloads.`)) return;
   try {
     const photos = selected.map((input) => ({ session_id: input.dataset.sessionId, relative_path: input.dataset.relativePath }));
     const result = await api("/api/local-admin/delete-photos", { photos });
