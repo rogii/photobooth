@@ -1,10 +1,10 @@
-# Raspberry Pi fotobås
+# Raspberry Pi Photobooth
 
-Fotobåset är avsett att köras på Raspberry Pi med Raspberry Pi OS Desktop. Installationen har testats framgångsrikt på en Raspberry Pi 5. Appen använder Flask, Chromium i kiosk-läge, gPhoto2 för kameran och GPIO för blixten. Webbgränssnittet kan även provas i demoläge på en vanlig dator.
+The photobooth is designed to run on Raspberry Pi with Raspberry Pi OS Desktop. It has been successfully tested on a Raspberry Pi 5. The app uses Flask, Chromium in kiosk mode, gPhoto2 for the camera, and GPIO for the flash. The web interface can also be tried in demo mode on a regular computer.
 
-## Prova gränssnittet lokalt
+## Try the interface locally
 
-Från projektmappen:
+From the project directory:
 
 ```sh
 python3 -m venv .venv
@@ -12,11 +12,11 @@ python3 -m venv .venv
 .venv/bin/python app.py --demo
 ```
 
-Öppna kiosken på `localhost:8080` och den vanliga adminpanelen på `localhost:8081`. Demoläget skapar exempelbilder utan kamera eller GPIO.
+Open the kiosk at `localhost:8080` and the regular admin panel at `localhost:8081`. Demo mode creates sample photos without a camera or GPIO.
 
-## Installera på Raspberry Pi
+## Install on Raspberry Pi
 
-Använd Raspberry Pi OS Desktop. Aktivera automatisk inloggning till skrivbordet om kiosken ska starta efter omstart. Kör från projektmappen:
+Use Raspberry Pi OS Desktop. Enable automatic desktop login if the kiosk should start after reboot. Run these commands from the project directory:
 
 ```sh
 cd photobooth
@@ -24,11 +24,11 @@ chmod +x install.sh launch-kiosk.sh
 ./install.sh
 ```
 
-Kör installationsskriptet som skrivbordsanvändaren, inte som root. Skriptet installerar beroenden, skapar den virtuella Python-miljön, installerar en `systemd --user`-tjänst och lägger Chromium i skrivbordets autostart. Det använder `sudo` för systempaket och för begränsade rättigheter till avstängningskommandot. Installationsanvändaren läggs till i gruppen `gpio`, och GPIO-enheterna får läs- och skrivåtkomst för den gruppen. Om användaren nyligen lagts till i gruppen behöver Pi:n startas om så att tjänsten får den nya gruppåtkomsten. Lägg även till andra konton som ska använda blixten i gruppen `gpio`.
+Run the installer as the desktop user, not as root. The script installs dependencies, creates the Python virtual environment, installs a `systemd --user` service, and adds Chromium to the desktop autostart. It uses `sudo` for system packages and restricted permission to run the shutdown command. The installation user is added to the `gpio` group, and GPIO devices are given read and write access for that group. If the user was recently added to the group, restart the Pi so the service receives the new group access. Also add any other accounts that need to use the flash to the `gpio` group.
 
-Kiosken öppnas lokalt på port 8080. Den vanliga adminpanelen använder port 8081.
+The kiosk is available locally on port 8080. The regular admin panel uses port 8081.
 
-Starta om tjänsten och visa dess status eller loggar med:
+Restart the service and view its status or logs with:
 
 ```sh
 systemctl --user restart photobooth.service
@@ -36,24 +36,24 @@ systemctl --user status photobooth.service
 journalctl --user -u photobooth.service -f
 ```
 
-Chromium ansluter igen när tjänsten har startats om. Kameran ansluts via USB. Kontrollera kameran med:
+Chromium reconnects after the service restarts. Connect the camera via USB. Check the camera with:
 
 ```sh
 gphoto2 --auto-detect
 gphoto2 --capture-preview --filename /tmp/preview.jpg
 ```
 
-## Funktioner
+## Features
 
-- Alla exponeringar sparas lokalt i `~/Photobooth/` med tidsstämpel i filnamnet (`YYYYMMDD-HHMMSS-microseconds.jpg`). Varje ny session har en egen bildmapp; äldre sessioner använder eventnamnets mapp. Enstaka bilder ligger direkt i sessionsmappen. Fyrbildsläget sparar originalrutorna i `singles/` och kollaget i sessionsmappen, så endast kollaget läggs till i galleriet.
-- Kioskens viloläge visar de senaste bilderna från aktiv session i en kolumninställbar bildvägg, nyast överst till vänster. Bildrutorna behåller bildens bildförhållande och den nedersta raden beskärs av skärmkanten. Under fotograferingen visas nedräkning och kamerans exponering. När nedräkningen når noll ligger "SMILE" kvar med information om att fotot fångas och laddas ned från kameran. För fyrbildssekvensen visas aktuell bild (1/4–4/4) med separat inställbar nedräkning inför varje bild. Resultatet visas så snart kamerafångst och bildbehandling är klara, utan en extra simulerad nedladdningsvy. En nedräkning på 0 utelämnar nedräkningen och "SMILE"-pausen.
-- En ny fotografering kan startas direkt från resultatbilden med `A` (en bild) eller `B` (fyra bilder). Annars återgår kiosken efter den konfigurerade visningstiden.
-- Kiosken på port 8080 visar vid start en lista över sparade, synliga sessioner, nyast först, eller låter dig skapa en ny session med skärmtangentbordet. Den vanliga adminpanelen på port 8081 behåller sina befintliga funktioner för sessioner, fångst, inställningar och ZIP-nedladdning. En separat lokal admin öppnas från kiosken genom att hålla på internetstatusen i sidfoten och ange PIN-koden (standard `1234`). Där kan foton förhandsgranskas, flyttas till en `deleted/`-mapp utan att tas bort permanent, och Raspberry Pi:n stängas av. Flyttade foton döljs från galleriet och räknaren men följer med i sessions-ZIP:en. PIN-koden ändras i den lokala adminsidan. En session kan fästas på displayen så den återställs efter omstart och kiosken hoppar över valdialogen. Att avfästa eller stoppa sessionen återför kiosken direkt till sessionsvalet. Kioskens bildvägg visar internetstatus i sidfoten.
-- GPIO-blixten kan konfigureras efter installationens hårdvara. Driv inte LED-slingor direkt från Pi:n; använd lämplig transistor/MOSFET eller LED-styrenhet och separat strömförsörjning.
-- Beständig lokal uppladdningskö. `upload_url` och `upload_token` i `config.json` styr multipart-uppladdning.
+- All exposures are stored locally in `~/Photobooth/` with a timestamp in the filename (`YYYYMMDD-HHMMSS-microseconds.jpg`). Each new session has its own photo folder; older sessions use the event name as the folder name. Single photos are stored directly in the session folder. Four-photo mode stores the original frames in `singles/` and the collage in the session folder, so only the collage is added to the gallery.
+- While idle, the kiosk shows the latest photos from the active session in a configurable-column photo wall, newest at the top left. Tiles preserve the image aspect ratio, and the bottom row is cropped by the edge of the screen. During a photo session, the countdown and camera exposure are shown. When the countdown reaches zero, “SMILE” remains on screen with a message that the photo is being captured and downloaded from the camera. For a four-photo sequence, the current frame (1/4–4/4) is shown with a separately configurable countdown before each frame. The result appears as soon as camera capture and image processing are complete, without an extra simulated download screen. A countdown of 0 skips the countdown and the “SMILE” pause.
+- A new photo session can be started directly from the result screen with `A` (one photo) or `B` (four photos). Otherwise, the kiosk returns to the gallery after the configured display time.
+- On startup, the kiosk on port 8080 shows a list of saved, visible sessions, newest first, or lets you create a new session using the on-screen keyboard. The regular admin panel on port 8081 retains its existing session, capture, settings, and ZIP download features. A separate local admin page can be opened from the kiosk by holding the internet status in the footer and entering the PIN (default `1234`). From there, photos can be previewed and moved to a `deleted/` folder without being permanently removed, and the Raspberry Pi can be shut down. Moved photos are hidden from the gallery and counter but are included in the session ZIP. Change the PIN on the local admin page. A session can be pinned on the display so it is restored after reboot and the kiosk skips the selection dialog. Unpinning or stopping the session returns the kiosk directly to session selection. The kiosk photo wall shows internet status in the footer.
+- The GPIO flash can be configured for the installed hardware. Do not drive LED strips directly from the Pi; use a suitable transistor/MOSFET or LED controller and a separate power supply.
+- Persistent local upload queue. `upload_url` and `upload_token` in `config.json` control multipart uploads.
 
-## Inställningar
+## Settings
 
-Ändra nedräkning för en bild, separat nedräkning inför varje bild i fyrbildssekvensen, kamerans förtriggning, intervall, antal kolumner i vilogalleriet och visningstid i adminpanelen. Kamerans förtriggning startar gPhoto2-kommandot det valda antalet sekunder innan nedräkningens nollpunkt; den kan kalibreras separat för kameran och miljön. Ändringarna skrivs beständigt till `config.json`. Övriga hårdvaru- och uppladdningsinställningar finns fortfarande i samma fil.
+Change the single-photo countdown, the separate countdown before each frame in a four-photo sequence, camera pre-trigger, interval, number of columns in the idle gallery, and display time in the admin panel. Camera pre-trigger starts the gPhoto2 command the selected number of seconds before the countdown reaches zero; it can be calibrated separately for the camera and environment. Changes are saved persistently to `config.json`. Other hardware and upload settings remain in the same file.
 
-Installationsskriptet ska köras som skrivbordsanvändaren eftersom det installerar en användartjänst och autostartfil i den användarens hemkatalog.
+The installer must be run as the desktop user because it installs a user service and an autostart file in that user's home directory.
