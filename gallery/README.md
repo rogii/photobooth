@@ -10,7 +10,7 @@ This folder currently contains the design plan only. The implementation and exac
 
 - Receive photos from configured photobooth installations through an authenticated upload API. Booths should be able to retry uploads after a network interruption.
 - List visible, active sessions and let visitors browse their photos.
-- Provide a full-screen slideshow for a paired TV display, suitable for a browser or a Raspberry Pi Zero connected to a TV.
+- Provide a full-screen slideshow web experience for paired TV display devices.
 - Update an open slideshow when new photos arrive in its session.
 - Let a browser client upvote each photo once. A database uniqueness rule should prevent duplicate votes from the same client identifier.
 - Let a paired TV upvote the photo currently on screen, once for each automatic slideshow appearance. A later automatic appearance makes that TV eligible to vote for the photo again.
@@ -26,11 +26,9 @@ This folder currently contains the design plan only. The implementation and exac
 - **Image storage:** Object storage or a dedicated persistent media store, separate from the database and outside the web root. Store generated identifiers rather than trusting uploaded filenames.
 - **Browser UI:** Server-rendered pages with focused JavaScript for browsing, voting, reporting, moderation, and slideshow playback. A separate frontend framework is not required for the first version.
 - **Live updates:** Server-Sent Events (SSE) can notify gallery and slideshow pages of session changes. Clients then fetch updated photo metadata. Short polling is a simpler fallback for an initial implementation.
-- **TV client:** A URL-driven, full-screen web slideshow that reconnects and refreshes if its network connection drops. It should run on low-power devices such as Raspberry Pi Zero.
-- **TV pairing:** Each Pi opens the same stable gallery URL. A new or unpaired TV displays a setup code; an administrator enters that code in the gallery admin interface and assigns a session to the TV. Pairing gives the display a stable identity, so it can show its assigned session on later visits without a session-specific URL. Setup codes should expire after pairing or timeout; the TV should retain a separate revocable device credential.
-- **GPIO controls:** A small local Python service can handle GPIO buttons and device setup while the browser renders the slideshow. Buttons can request an upvote or step backward/forward. The gallery remains the authority for vote eligibility and vote counts.
+- **TV display API:** Provide pairing, session assignment, slideshow data, and vote endpoints for the separately deployed TV client. Each Pi opens the same stable gallery URL. A new or unpaired TV displays a setup code; an administrator enters that code in the gallery admin interface and assigns a session to the TV. Pairing gives the display a stable identity, so it can show its assigned session on later visits without a session-specific URL. Setup codes should expire after pairing or timeout; the TV should retain a separate revocable device credential.
 
-The web app should be deployed independently from the booth service. The photobooth remains responsible for capture and its persistent upload queue; the gallery handles shared browsing, slideshow playback, voting, reporting, and moderation. This keeps photo browsing available when booth hardware is offline.
+The gallery server should be deployed independently from both the booth service and the TV display client. The photobooth remains responsible for capture and its persistent upload queue; the gallery handles shared browsing, slideshow data, voting, reporting, TV pairing, and moderation. This keeps photo browsing available when booth hardware is offline. The separate [`tv-display/`](../tv-display/) component is installed on the Pi Zero and handles local Wi-Fi setup, GPIO buttons, and launching the browser against the gallery service.
 
 ## Initial repository structure
 
@@ -44,7 +42,7 @@ gallery/
 ├── config.example.env      # Example settings; secrets stay out of Git
 ├── app/
 │   ├── __init__.py         # Flask app factory and configuration
-│   ├── routes/             # Public pages, upload API, moderation API
+│   ├── routes/             # Public pages, upload, TV, and moderation APIs
 │   ├── models.py           # Sessions, photos, votes, reports
 │   ├── slideshow.py        # Weighted photo selection
 │   ├── storage.py          # Image storage adapter
@@ -53,6 +51,8 @@ gallery/
 ├── migrations/             # Database schema migrations
 └── deploy/                 # Example service and reverse-proxy configuration
 ```
+
+The Pi Zero client is a separate deployable component in [`../tv-display/`](../tv-display/), with its own installation script and runtime. The gallery contains the hosted server and web experience only.
 
 ## Core data concepts
 
