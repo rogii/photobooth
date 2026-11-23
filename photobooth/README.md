@@ -12,7 +12,7 @@ python3 -m venv .venv
 .venv/bin/python app.py --demo
 ```
 
-Öppna sedan [http://127.0.0.1:8080](http://127.0.0.1:8080). Demoläget skapar exempelbilder och låtsasfoton utan kamera eller GPIO. Det går även att visa webbsidan från en annan dator på samma nätverk genom att starta servern med `--host 0.0.0.0`; använd då Pi:ns eller datorns IP-adress på port 8080.
+Öppna kioskvisningen på [http://127.0.0.1:8080](http://127.0.0.1:8080) och adminpanelen på [http://127.0.0.1:8081/admin](http://127.0.0.1:8081/admin). Demoläget skapar exempelbilder och låtsasfoton utan kamera eller GPIO. Det går även att visa webbsidan från en annan dator på samma nätverk genom att starta servern med `--host 0.0.0.0`; använd Pi:ns eller datorns IP-adress på port 8080 för kiosken och port 8081/admin för adminpanelen.
 
 ## Raspberry Pi kiosk
 
@@ -41,7 +41,7 @@ gphoto2 --auto-detect
 gphoto2 --capture-preview --filename /tmp/preview.jpg
 ```
 
-På Raspberry Pi OS använder kioskstartaren Chromium i helskärmsläge på `http://127.0.0.1:8080`. Servern lyssnar även på nätverksgränssnitten så en annan dator på samma nät kan öppna Pi:ns adress på port 8080.
+På Raspberry Pi OS använder kioskstartaren Chromium i helskärmsläge på `http://127.0.0.1:8080`. Servern lyssnar även på nätverksgränssnitten så en annan dator på samma nät kan öppna Pi:ns adress på port 8080 för kiosken eller 8081/admin för administration.
 
 ## Anslutning till befintlig Pi
 
@@ -55,21 +55,15 @@ Anslut med `ssh jonas@10.66.25.48`. Synka projektets `photobooth/`-katalog till 
 
 ## Funktioner
 
-- Ingen kameraförhandsvisning hämtas i viloläge. Efter en exponering visas fotot i huvudytan i 10 sekunder, eller tills nästa fotografering startar.
-- Enstaka bilder och 2×2-kollage av fyra bilder, med justerbar nedräkning och intervall.
-- Touchvänligt tangentbord för sessionsnamn och Bluetoothknapp som skickar `a` eller `b`.
+- Alla exponeringar sparas lokalt i `~/Photobooth/<eventnamn>/` med tidsstämpel i filnamnet (`YYYYMMDD-HHMMSS-microseconds.jpg`). Enstaka bilder ligger direkt i eventmappen. Fyrbildsläget sparar originalrutorna i `singles/` och kollaget direkt i eventmappen, så endast kollaget läggs till i galleriet.
+- Kioskens viloläge visar de senaste kolumnantalet i kvadrat av bilder från aktivt event i en kolumninställbar bildvägg, nyast överst till vänster. Bildrutorna fylls utan svarta fält och galleriet får inga rullningslister. Antalet rader beräknas automatiskt och originalfilerna används utan genererade miniatyrbilder. Under fotograferingen visas nedräkning och kamerans exponering. För fyrbildssekvensen visas aktuell bild (1/4–4/4) med separat inställbar nedräkning inför varje bild. Efter varje färdig kameraexponering visas simulerad "Capture download progress" innan nästa bild startar. En nedräkning på 0 utelämnar både nedräkningen och "SMILE"-pausen.
+- En ny fotografering kan startas direkt från resultatbilden med `A` (en bild) eller `B` (fyra bilder). Annars återgår kiosken efter den konfigurerade visningstiden.
+- Adminpanelen på port 8081 visar systemstatus, låter administratören starta ett event, ändra beständiga inställningar och starta om tjänsten. Kioskvisningen ligger på port 8080.
 - GPIO-blixt med standard BCM 17. Driv inte LED-slingor direkt från Pi:n; använd lämplig transistor/MOSFET eller LED-styrenhet och separat strömförsörjning.
 - Beständig lokal uppladdningskö. `upload_url` och `upload_token` i `config.json` styr multipart-uppladdning.
-- Tillfällig stoppknapp i gränssnittet för testkörningar.
 
 ## Inställningar
 
-Redigera `config.json`:
-
-- `countdown_seconds`: standardnedräkning.
-- `sequence_interval_seconds`: standardpaus mellan fyrbildslägets exponeringar.
-- `gpio_flash_pin` och `flash_seconds`: GPIO-signal och blixtlängd.
-- `key_single` / `key_sequence`: tangentkommandon från Bluetoothknappen.
-- `upload_url` / `upload_token`: uppladdnings-API. Jobben sparas i `~/Photobooth/upload-queue/` och försöks igen tills API:t ger 2xx.
+Ändra nedräkning för en bild, separat nedräkning inför varje bild i fyrbildssekvensen, intervall, antal kolumner i vilogalleriet och visningstid i adminpanelen. Ändringarna skrivs beständigt till `config.json`. Övriga hårdvaru- och uppladdningsinställningar finns fortfarande i samma fil.
 
 Installationsskriptet ska köras som skrivbordsanvändaren eftersom det installerar en användartjänst och autostartfil i den användarens hemkatalog.

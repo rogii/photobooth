@@ -7,5 +7,8 @@
   "sequence_interval_seconds": 0.8,
   "flash_seconds": 0.18,
   "key_single": "a",
-  "key_sequence": "b"
+  "key_sequence": "b",
+  "result_timeout_seconds": 8,
+  "sequence_countdown_seconds": 2,
+  "idle_gallery_columns": 3
 }
