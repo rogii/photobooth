@@ -12,7 +12,7 @@ python3 -m venv .venv
 .venv/bin/python app.py --demo
 ```
 
-Öppna kioskvisningen på [http://127.0.0.1:8080](http://127.0.0.1:8080) och adminpanelen på [http://127.0.0.1:8081/admin](http://127.0.0.1:8081/admin). Demoläget skapar exempelbilder och låtsasfoton utan kamera eller GPIO. Det går även att visa webbsidan från en annan dator på samma nätverk genom att starta servern med `--host 0.0.0.0`; använd Pi:ns eller datorns IP-adress på port 8080 för kiosken och port 8081/admin för adminpanelen.
+Öppna kioskvisningen på [http://127.0.0.1:8080](http://127.0.0.1:8080) och adminpanelen på [http://127.0.0.1:8081](http://127.0.0.1:8081) eller `/admin`. Demoläget skapar exempelbilder och låtsasfoton utan kamera eller GPIO. Det går även att visa webbsidan från en annan dator på samma nätverk genom att starta servern med `--host 0.0.0.0`; använd Pi:ns eller datorns IP-adress på port 8080 för kiosken och port 8081 för adminpanelen.
 
 ## Raspberry Pi kiosk
 
@@ -55,10 +55,10 @@ Anslut med `ssh jonas@10.66.25.48`. Synka projektets `photobooth/`-katalog till 
 
 ## Funktioner
 
-- Alla exponeringar sparas lokalt i `~/Photobooth/<eventnamn>/` med tidsstämpel i filnamnet (`YYYYMMDD-HHMMSS-microseconds.jpg`). Enstaka bilder ligger direkt i eventmappen. Fyrbildsläget sparar originalrutorna i `singles/` och kollaget direkt i eventmappen, så endast kollaget läggs till i galleriet.
+- Alla exponeringar sparas lokalt i `~/Photobooth/` med tidsstämpel i filnamnet (`YYYYMMDD-HHMMSS-microseconds.jpg`). Varje ny session har en egen bildmapp; äldre sessioner använder eventnamnets mapp. Enstaka bilder ligger direkt i sessionsmappen. Fyrbildsläget sparar originalrutorna i `singles/` och kollaget i sessionsmappen, så endast kollaget läggs till i galleriet.
 - Kioskens viloläge visar de senaste kolumnantalet i kvadrat av bilder från aktivt event i en kolumninställbar bildvägg, nyast överst till vänster. Bildrutorna fylls utan svarta fält och galleriet får inga rullningslister. Antalet rader beräknas automatiskt och originalfilerna används utan genererade miniatyrbilder. Under fotograferingen visas nedräkning och kamerans exponering. För fyrbildssekvensen visas aktuell bild (1/4–4/4) med separat inställbar nedräkning inför varje bild. Efter varje färdig kameraexponering visas simulerad "Capture download progress" innan nästa bild startar. En nedräkning på 0 utelämnar både nedräkningen och "SMILE"-pausen.
 - En ny fotografering kan startas direkt från resultatbilden med `A` (en bild) eller `B` (fyra bilder). Annars återgår kiosken efter den konfigurerade visningstiden.
-- Adminpanelen på port 8081 visar systemstatus, låter administratören starta ett event, ändra beständiga inställningar och starta om tjänsten. Kioskvisningen ligger på port 8080.
+- Kiosken på port 8080 visar vid start en lista över sparade, synliga sessioner, nyast först, eller låter dig skapa en ny session med skärmtangentbordet. Adminpanelen på port 8081 kan skapa och välja session, dölja sessioner från kioskens startlista, ladda ned en sessions exponeringar som ZIP och radera en session med dess bilder. Den visar även lagringsutrymme och internetstatus. En session kan fästas på displayen så den återställs efter omstart och kiosken hoppar över valdialogen. Att avfästa eller stoppa sessionen återför kiosken direkt till sessionsvalet. Kioskens bildvägg visar internetstatus i sidfoten.
 - GPIO-blixt med standard BCM 17. Driv inte LED-slingor direkt från Pi:n; använd lämplig transistor/MOSFET eller LED-styrenhet och separat strömförsörjning.
 - Beständig lokal uppladdningskö. `upload_url` och `upload_token` i `config.json` styr multipart-uppladdning.
 

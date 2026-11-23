@@ -8,6 +8,7 @@ let galleryRows = null;
 let galleryPhotos = [];
 let galleryRequest = false;
 let galleryLayout = "";
+let pickerOpen = false;
 
 async function api(path, body) {
   const response = await fetch(path, {
@@ -30,6 +31,9 @@ function render(current) {
   $("#upload-indicator").classList.toggle("pending", queuedUploads > 0);
   $("#upload-status").textContent = queuedUploads > 0 ? "UPLOADS PENDING" : "ALL UPLOADED";
   $("#upload-count").textContent = queuedUploads > 0 ? `${queuedUploads} queued` : "";
+  const online = !!current.host_info?.internet_connected;
+  $("#internet-status").textContent = online ? "ONLINE" : "OFFLINE";
+  $("#internet-indicator").classList.toggle("offline", !online);
   const gallery = $("#gallery");
   const overlay = $("#overlay");
   renderGallery();
@@ -63,6 +67,74 @@ function render(current) {
     $("#result").src = `/api/recent-photo?v=${encodeURIComponent(lastVersion)}`;
   }
   $("#error").textContent = current.status.startsWith("Capture failed") ? current.status : "";
+  if (!current.session && !current.locked_session) showSessionPicker(current.sessions || []);
+  if (current.session) closeSessionPicker();
+}
+
+function showSessionPicker(sessions) {
+  const dialog = $("#session-dialog");
+  if (!pickerOpen) {
+    pickerOpen = true;
+    dialog.classList.remove("hidden");
+    $("#session-input").focus();
+  }
+  const list = $("#session-list");
+  const signature = sessions.map((item) => `${item.id}:${item.name}`).join("|");
+  if (list.dataset.signature === signature) return;
+  list.dataset.signature = signature;
+  list.replaceChildren();
+  if (!sessions.length) {
+    const empty = document.createElement("p");
+    empty.className = "session-empty";
+    empty.textContent = "No saved sessions yet.";
+    list.append(empty);
+  }
+  sessions.forEach((session) => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "session-choice";
+    button.innerHTML = `<strong></strong><span></span>`;
+    button.querySelector("strong").textContent = session.name;
+    button.querySelector("span").textContent = session.created_at ? new Date(session.created_at).toLocaleString() : "Saved session";
+    button.addEventListener("click", async () => {
+      try {
+        await api("/api/session/select", { id: session.id });
+        closeSessionPicker();
+        await refresh();
+      } catch (error) { $("#picker-error").textContent = error.message; }
+    });
+    list.append(button);
+  });
+}
+
+function closeSessionPicker() {
+  pickerOpen = false;
+  $("#session-dialog").classList.add("hidden");
+}
+
+function renderKeyboard() {
+  const keyboard = $("#onscreen-keyboard");
+  ["1234567890", "qwertyuiop", "asdfghjklå", "zxcvbnmäö.-"].forEach((chars) => {
+    const row = document.createElement("div"); row.className = "keyboard-row";
+    [...chars].forEach((char) => {
+      const key = document.createElement("button"); key.type = "button"; key.className = "key-button"; key.textContent = char;
+      key.addEventListener("click", () => { $("#session-input").value += char; syncPickerName(); }); row.append(key);
+    }); keyboard.append(row);
+  });
+  const row = document.createElement("div"); row.className = "keyboard-row";
+  [["⌫", () => { $("#session-input").value = $("#session-input").value.slice(0, -1); }], ["Space", () => { $("#session-input").value += " "; }], ["Clear", () => { $("#session-input").value = ""; }]].forEach(([label, action]) => {
+    const key = document.createElement("button"); key.type = "button"; key.className = "key-button wide"; key.textContent = label;
+    key.addEventListener("click", () => { action(); syncPickerName(); }); row.append(key);
+  }); keyboard.append(row);
+}
+
+function syncPickerName() { $("#create-session").disabled = !$("#session-input").value.trim(); }
+
+async function createSession() {
+  try {
+    await api("/api/session", { name: $("#session-input").value });
+    closeSessionPicker(); await refresh();
+  } catch (error) { $("#picker-error").textContent = error.message; }
 }
 
 function setConnectionStatus(isConnected) {
@@ -149,6 +221,9 @@ document.addEventListener("keydown", (event) => {
 });
 
 refresh();
+renderKeyboard();
+$("#session-input").addEventListener("input", syncPickerName);
+$("#create-session").addEventListener("click", createSession);
 setInterval(refresh, 250);
 window.addEventListener("resize", () => {
   galleryLayout = "";
