@@ -25,6 +25,13 @@ async function refresh() {
       if (input && document.activeElement !== input && key !== "upload_token") input.value = value;
     }
     renderSessions(state.sessions || [], state.session, state.locked_session);
+    const overlaySession = state.session;
+    $("#overlay-status").textContent = overlaySession
+      ? `${overlaySession.name}: ${overlaySession.overlay ? `overlay configured (${overlaySession.overlay})` : "no overlay configured"}`
+      : "Choose or start a session to configure its overlay.";
+    $("#overlay-file").disabled = !overlaySession || state.busy;
+    $("#overlay-form button").disabled = !overlaySession || state.busy;
+    $("#remove-overlay").disabled = !overlaySession || !overlaySession.overlay || state.busy;
     renderHost(state.host_info || {});
     const captureDisabled = !state.session || state.busy;
     $("#capture-one").disabled = captureDisabled;
@@ -115,6 +122,32 @@ $("#settings-form").addEventListener("submit", async (event) => {
   } catch (error) {
     say(error.message);
   }
+});
+
+async function saveOverlay(remove = false) {
+  const state = await api("/api/admin/state");
+  if (!state.session) throw new Error("Choose or start a session first");
+  const form = new FormData();
+  if (remove) form.set("remove", "1");
+  else {
+    const file = $("#overlay-file").files[0];
+    if (!file) throw new Error("Choose a PNG or WebP overlay image");
+    form.set("overlay", file);
+  }
+  const response = await fetch(`/api/admin/session-overlay/${encodeURIComponent(state.session.id)}`, { method: "POST", body: form, cache: "no-store" });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(data.error || `Request failed (${response.status})`);
+  $("#overlay-file").value = "";
+  say(remove ? "Session overlay removed" : "Session overlay saved");
+  refresh();
+}
+
+$("#overlay-form").addEventListener("submit", async (event) => {
+  event.preventDefault();
+  try { await saveOverlay(); } catch (error) { say(error.message); }
+});
+$("#remove-overlay").addEventListener("click", async () => {
+  try { await saveOverlay(true); } catch (error) { say(error.message); }
 });
 
 async function capture(count) {
