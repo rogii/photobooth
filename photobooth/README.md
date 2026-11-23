@@ -24,7 +24,7 @@ chmod +x install.sh launch-kiosk.sh
 ./install.sh
 ```
 
-Kör installationsskriptet som skrivbordsanvändaren, inte som root. Skriptet installerar beroenden, skapar den virtuella Python-miljön, installerar en `systemd --user`-tjänst och lägger Chromium i skrivbordets autostart. Det använder `sudo` för systempaket och för en begränsad regel som tillåter appen att köra `systemctl poweroff`.
+Kör installationsskriptet som skrivbordsanvändaren, inte som root. Skriptet installerar beroenden, skapar den virtuella Python-miljön, installerar en `systemd --user`-tjänst och lägger Chromium i skrivbordets autostart. Det använder `sudo` för systempaket och för begränsade rättigheter till avstängningskommandot. Installationsanvändaren läggs till i gruppen `gpio`, och GPIO-enheterna får läs- och skrivåtkomst för den gruppen. Om användaren nyligen lagts till i gruppen behöver Pi:n startas om så att tjänsten får den nya gruppåtkomsten. Lägg även till andra konton som ska använda blixten i gruppen `gpio`.
 
 Kiosken öppnas lokalt på port 8080. Den vanliga adminpanelen använder port 8081.
 
