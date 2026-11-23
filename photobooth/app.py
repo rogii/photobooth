@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import hmac
 import json
 import os
 import shutil
@@ -18,7 +19,7 @@ import zipfile
 from datetime import datetime
 from pathlib import Path
 
-from flask import Flask, jsonify, request, send_file, send_from_directory
+from flask import Flask, jsonify, redirect, request, send_file, send_from_directory, session
 from PIL import Image, ImageDraw, ImageOps
 
 BASE = Path(__file__).resolve().parent
@@ -45,6 +46,7 @@ class PhotoboothService:
     def __init__(self, demo=False):
         self.config = read_config()
         self.config.setdefault("capture_lead_seconds", 1.2)
+        self.config.setdefault("admin_pin", "1234")
         self.demo = demo
         self.camera_lock = threading.Lock()
         self.state_lock = threading.Lock()
@@ -298,6 +300,11 @@ class PhotoboothService:
         with self.state_lock:
             if self.busy:
                 raise RuntimeError("Wait for the current capture to finish before changing settings")
+        admin_pin = None
+        if "admin_pin" in values:
+            admin_pin = str(values["admin_pin"]).strip()
+            if not admin_pin.isdigit() or not 4 <= len(admin_pin) <= 12:
+                raise ValueError("Admin PIN must contain 4 to 12 digits")
         previous_gpio_pin = self.config.get("gpio_flash_pin", 17)
         allowed = {"countdown_seconds": (0, 30, int), "sequence_countdown_seconds": (0, 30, int), "capture_lead_seconds": (0, 5, float), "sequence_interval_seconds": (0, 10, float), "idle_gallery_columns": (1, 12, int), "result_timeout_seconds": (1, 300, int), "gpio_flash_pin": (0, 27, int), "flash_seconds": (0, 5, float)}
         for key, (low, high, cast) in allowed.items():
@@ -306,6 +313,8 @@ class PhotoboothService:
         for key in ("camera_command", "upload_url", "upload_token", "key_single", "key_sequence"):
             if key in values:
                 self.config[key] = str(values[key]).strip()
+        if admin_pin is not None:
+            self.config["admin_pin"] = admin_pin
         if self.config.get("gpio_flash_pin", 17) != previous_gpio_pin:
             if self.flash:
                 self.flash.close()
@@ -677,12 +686,31 @@ class PhotoboothService:
 def create_app(service, admin_port=ADMIN_PORT):
     web = Flask(__name__, static_folder="static", static_url_path="/static")
     web.config["SEND_FILE_MAX_AGE_DEFAULT"] = 0
+    web.secret_key = os.urandom(32)
 
     @web.before_request
     def admin_port_only():
         protected = {"admin", "save_config", "admin_event", "admin_session_lock", "admin_session_stop", "admin_session_hidden", "admin_session_delete", "admin_session_download", "admin_capture", "restart_app", "get_admin_state"}
+        port = int(request.environ.get("SERVER_PORT", 0))
         if request.endpoint in protected and int(request.environ.get("SERVER_PORT", 0)) != admin_port:
             return jsonify({"error": f"Open the admin interface on port {admin_port}"}), 404
+        admin_page = request.endpoint == "admin" or (request.endpoint == "index" and port == admin_port)
+        admin_request = request.endpoint in protected or admin_page
+        if admin_request and request.endpoint != "admin_unlock" and not session.get("admin_unlocked"):
+            if admin_page:
+                kiosk_url = request.url_root.replace(f":{admin_port}/", ":8080/")
+                return redirect(kiosk_url)
+            return jsonify({"error": "Admin PIN required"}), 401
+
+    @web.post("/api/admin/unlock")
+    def admin_unlock():
+        payload = request.get_json(silent=True) or {}
+        expected = str(service.config.get("admin_pin", "1234"))
+        provided = str(payload.get("pin", ""))
+        if not hmac.compare_digest(provided, expected):
+            return jsonify({"error": "Invalid PIN"}), 401
+        session["admin_unlocked"] = True
+        return jsonify({"unlocked": True})
 
     @web.get("/")
     def index():
@@ -698,7 +726,7 @@ def create_app(service, admin_port=ADMIN_PORT):
     def get_admin_state():
         result = service.state()
         result["sessions"] = service.list_sessions(include_hidden=True)
-        result["config"] = {key: service.config.get(key, "") for key in ("countdown_seconds", "sequence_countdown_seconds", "capture_lead_seconds", "sequence_interval_seconds", "idle_gallery_columns", "result_timeout_seconds", "camera_command", "upload_url", "gpio_flash_pin", "flash_seconds", "key_single", "key_sequence")}
+        result["config"] = {key: service.config.get(key, "") for key in ("countdown_seconds", "sequence_countdown_seconds", "capture_lead_seconds", "sequence_interval_seconds", "idle_gallery_columns", "result_timeout_seconds", "camera_command", "upload_url", "gpio_flash_pin", "flash_seconds", "key_single", "key_sequence", "admin_pin")}
         return jsonify(result)
 
     @web.post("/api/admin/event")

@@ -30,7 +30,7 @@
         <span class="footer-divider"></span>
         <div class="event-stat upload-stat"><i id="upload-indicator"></i><strong id="upload-status">ALL UPLOADED</strong><span id="upload-count"></span></div>
         <span class="footer-divider"></span>
-        <div class="event-stat internet-stat"><i id="internet-indicator"></i><strong id="internet-status">CHECKING</strong><span>INTERNET</span></div>
+        <div id="admin-access" class="event-stat internet-stat" role="button" tabindex="0" aria-label="Hold to open the local admin panel"><i id="internet-indicator"></i><strong id="internet-status">CHECKING</strong><span>INTERNET</span></div>
       </div>
     </footer>
     <div id="session-dialog" class="session-picker hidden" role="dialog" aria-modal="true">
@@ -56,6 +56,22 @@
     </div>
     <div id="connection-status" class="connection-overlay hidden" role="status" aria-live="polite">
       <div><span class="connection-spinner"></span><h1>CONNECTION LOST</h1><p>Reconnecting to photobooth…</p></div>
+    </div>
+    <div id="admin-pin-dialog" class="admin-pin-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="admin-pin-title">
+      <form id="admin-pin-form" class="admin-pin-card">
+        <span class="picker-kicker">ADMIN ACCESS</span>
+        <h1 id="admin-pin-title">Enter PIN</h1>
+        <p>Enter the admin PIN to continue.</p>
+        <input id="admin-pin-input" type="password" inputmode="numeric" maxlength="12" autocomplete="current-password" aria-label="Admin PIN">
+        <div class="admin-pin-pad" aria-label="PIN keypad">
+          <button type="button" data-pin-digit="1">1</button><button type="button" data-pin-digit="2">2</button><button type="button" data-pin-digit="3">3</button>
+          <button type="button" data-pin-digit="4">4</button><button type="button" data-pin-digit="5">5</button><button type="button" data-pin-digit="6">6</button>
+          <button type="button" data-pin-digit="7">7</button><button type="button" data-pin-digit="8">8</button><button type="button" data-pin-digit="9">9</button>
+          <button type="button" data-pin-action="clear">Clear</button><button type="button" data-pin-digit="0">0</button><button type="button" data-pin-action="delete">⌫</button>
+        </div>
+        <div id="admin-pin-error" role="status"></div>
+        <div class="admin-pin-actions"><button id="admin-pin-back" type="button">Back</button><button type="submit">Continue</button></div>
+      </form>
     </div>
     <div id="error" class="error"></div>
   </main>

@@ -10,6 +10,37 @@ let galleryRequest = false;
 let galleryLayout = "";
 let pickerOpen = false;
 let capsLock = false;
+let adminHoldTimer = null;
+
+function showAdminPin() {
+  adminHoldTimer = null;
+  $("#admin-access").classList.remove("holding");
+  $("#admin-pin-dialog").classList.remove("hidden");
+  $("#admin-pin-input").value = "";
+  $("#admin-pin-error").textContent = "";
+  $("#admin-pin-input").focus();
+}
+
+function openAdminPanel() {
+  const adminUrl = new URL(window.location.href);
+  adminUrl.port = "8081";
+  adminUrl.pathname = "/admin";
+  adminUrl.search = "";
+  adminUrl.hash = "";
+  window.location.assign(adminUrl.toString());
+}
+
+function startAdminHold() {
+  if (adminHoldTimer !== null) return;
+  $("#admin-access").classList.add("holding");
+  adminHoldTimer = window.setTimeout(showAdminPin, 1200);
+}
+
+function cancelAdminHold() {
+  if (adminHoldTimer !== null) window.clearTimeout(adminHoldTimer);
+  adminHoldTimer = null;
+  $("#admin-access").classList.remove("holding");
+}
 
 async function api(path, body) {
   const response = await fetch(path, {
@@ -237,7 +268,7 @@ async function capture(count) {
 }
 
 document.addEventListener("keydown", (event) => {
-  if (!connected) return;
+  if (!connected || !$("#admin-pin-dialog").classList.contains("hidden")) return;
   if (event.key.toLowerCase() === (state?.keys?.single || "a").toLowerCase()) capture(1);
   if (event.key.toLowerCase() === (state?.keys?.sequence || "b").toLowerCase()) capture(4);
 });
@@ -253,4 +284,44 @@ window.addEventListener("resize", () => {
   galleryLayout = "";
   renderGallery();
   updateGallery();
+});
+
+const adminAccess = $("#admin-access");
+adminAccess.addEventListener("pointerdown", (event) => {
+  if (!event.isPrimary || (event.pointerType === "mouse" && event.button !== 0)) return;
+  event.preventDefault();
+  startAdminHold();
+});
+["pointerup", "pointercancel", "pointerleave"].forEach((name) => adminAccess.addEventListener(name, cancelAdminHold));
+adminAccess.addEventListener("keydown", (event) => {
+  if (event.key === "Enter" || event.key === " ") {
+    event.preventDefault();
+    startAdminHold();
+  }
+});
+["keyup", "blur"].forEach((name) => adminAccess.addEventListener(name, cancelAdminHold));
+
+$("#admin-pin-back").addEventListener("click", () => $("#admin-pin-dialog").classList.add("hidden"));
+$(".admin-pin-pad").addEventListener("click", (event) => {
+  const button = event.target.closest("button");
+  if (!button) return;
+  const input = $("#admin-pin-input");
+  if (button.dataset.pinDigit !== undefined) input.value += button.dataset.pinDigit;
+  if (button.dataset.pinAction === "clear") input.value = "";
+  if (button.dataset.pinAction === "delete") input.value = input.value.slice(0, -1);
+});
+$("#admin-pin-form").addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const submit = $("#admin-pin-form button[type='submit']");
+  submit.disabled = true;
+  $("#admin-pin-error").textContent = "";
+  try {
+    await api("/api/admin/unlock", { pin: $("#admin-pin-input").value });
+    openAdminPanel();
+  } catch (error) {
+    $("#admin-pin-error").textContent = error.message === "Invalid PIN" ? "Incorrect PIN. Try again." : error.message;
+    $("#admin-pin-input").select();
+  } finally {
+    submit.disabled = false;
+  }
 });
