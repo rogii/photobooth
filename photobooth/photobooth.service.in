@@ -1,0 +1,17 @@
+[Unit]
+Description=Photobooth local web app
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=@APP_DIR@
+Environment=PHOTOBOOTH_DATA=@USER_HOME@/Photobooth
+Environment=PYTHONUNBUFFERED=1
+ExecStart=@APP_DIR@/.venv/bin/python @APP_DIR@/app.py --host 0.0.0.0 --port 8080
+Restart=always
+RestartSec=2
+KillSignal=SIGINT
+TimeoutStopSec=30
+
+[Install]
+WantedBy=default.target
