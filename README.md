@@ -8,4 +8,4 @@ Photos are stored locally for each event. The kiosk shows a sorted photo wall wh
 
 The planned [`gallery/`](gallery/) service is a separate, always-available web app for browsing active photo sessions and displaying live slideshows on TVs. It will receive photos from one or more photobooth installations, support photo upvotes and reports, and provide a moderation workflow. The gallery is intended to run on a dedicated server or cloud service, so visitors can browse existing sessions even when no booths are running. A Raspberry Pi Zero or another browser-capable device can display a session slideshow.
 
-The gallery is at the design stage; its initial architecture and proposed repository structure are documented in [`gallery/README.md`](gallery/README.md).
+The gallery server and the Raspberry Pi TV display are separate deployable components. The TV display has its own setup flow, GPIO controls, kiosk browser, and installation script, documented in [`tv-display/`](tv-display/). The gallery server plan is documented in [`gallery/README.md`](gallery/README.md).
