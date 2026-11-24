@@ -383,7 +383,7 @@ class PhotoboothService:
                 if photo.is_symlink() or not photo.is_file() or photo.suffix.lower() not in (".jpg", ".jpeg"):
                     continue
                 relative = photo.relative_to(folder)
-                if {part.lower() for part in relative.parts} & {"deleted", "overlay", "overlays"}:
+                if {part.lower() for part in relative.parts} & {"deleted", "overlay", "overlays", "sequence"}:
                     continue
                 try:
                     modified = photo.stat().st_mtime
@@ -423,24 +423,27 @@ class PhotoboothService:
                 session_id = str(entry.get("session_id", ""))
                 relative_path = str(entry.get("relative_path", ""))
                 root, source, relative = self.local_admin_photo_path(session_id, relative_path)
-                paired_paths = {relative}
-                if len(relative.parts) == 2 and relative.parts[0] == "overlay" and relative.stem.endswith("_overlay"):
-                    original_name = relative.stem.removesuffix("_overlay") + relative.suffix
-                    original = Path(original_name)
-                    original_path = root / original
-                    if original_path.is_file() and not original_path.is_symlink():
-                        paired_paths.add(original)
-                    group_relative = original
+                if len(relative.parts) == 2 and relative.parts[0] == "sequence":
+                    base, separator, index = relative.stem.rpartition("_")
+                    group_relative = Path(f"{base}{relative.suffix}") if separator and index.isdigit() else relative
+                elif len(relative.parts) == 2 and relative.parts[0] == "overlay" and relative.stem.endswith("_overlay"):
+                    group_relative = Path(relative.stem.removesuffix("_overlay") + ".jpg")
                 else:
                     group_relative = relative
-                    if len(relative.parts) == 1 and relative.suffix.lower() in (".jpg", ".jpeg"):
-                        overlay_relative = Path("overlay") / f"{relative.stem}_overlay.jpg"
-                        overlay_path = root / overlay_relative
-                        if overlay_path.is_file() and not overlay_path.is_symlink():
-                            paired_paths.add(overlay_relative)
                 group_key = (session_id, group_relative.as_posix())
                 group = groups.setdefault(group_key, {"root": root, "paths": set()})
-                group["paths"].update(paired_paths)
+                group["paths"].update((relative, group_relative))
+                if len(group_relative.parts) == 1 and group_relative.suffix.lower() in (".jpg", ".jpeg"):
+                    overlay_relative = Path("overlay") / f"{group_relative.stem}_overlay.jpg"
+                    overlay_path = root / overlay_relative
+                    if overlay_path.is_file() and not overlay_path.is_symlink():
+                        group["paths"].add(overlay_relative)
+                    sequence_dir = root / "sequence"
+                    if sequence_dir.is_dir():
+                        for candidate in sequence_dir.glob(f"{group_relative.stem}_*.jpg"):
+                            index = candidate.stem.rpartition("_")[2]
+                            if index.isdigit() and candidate.is_file() and not candidate.is_symlink():
+                                group["paths"].add(candidate.relative_to(root))
 
             moved = 0
             for group in groups.values():
@@ -531,7 +534,11 @@ class PhotoboothService:
         folder = self.session_photo_dir(event)
         if not folder.is_dir():
             return []
-        files = sorted(folder.glob("*.jpg"), key=lambda path: path.name, reverse=True)
+        files = sorted(
+            (path for path in folder.glob("*.jpg") if not path.stem.endswith("-sequence-frame")),
+            key=lambda path: path.name,
+            reverse=True,
+        )
         columns = max(1, min(12, int(self.config.get("idle_photo_wall_columns", 3))))
         files = files[:columns * max(1, min(12, int(rows)))]
         result = []
@@ -722,7 +729,7 @@ class PhotoboothService:
                             if self.flash:
                                 self.flash.on()
                                 time.sleep(float(self.config.get("flash_seconds", 0.18)))
-                            capture_result["photo"] = self.capture_one()
+                            capture_result["photo"] = self.capture_one(sequence_frame=(count == 4))
                         except Exception as exc:
                             capture_result["error"] = exc
                         finally:
@@ -770,7 +777,6 @@ class PhotoboothService:
                     raise capture_result["error"]
                 photo = capture_result["photo"]
                 files.append(photo)
-                self.make_overlaid_photo(photo, self.session)
                 if index + 1 < count:
                     time.sleep(interval)
             result = self.make_result(files)
@@ -780,11 +786,17 @@ class PhotoboothService:
                 stored = event_folder / f"{datetime.now().strftime('%Y%m%d-%H%M%S-%f')}-strip.jpg"
                 shutil.copy2(result, stored)
                 result = stored
-            with self.state_lock:
-                self.photo_wall_revision += 1
+            if count > 1:
+                sequence_folder = event_folder / "sequence"
+                sequence_folder.mkdir(parents=True, exist_ok=True)
+                for index, photo in enumerate(files, start=1):
+                    destination = sequence_folder / f"{result.stem}_{index}{photo.suffix.lower()}"
+                    photo.replace(destination)
             session = self.session
             display_result = self.make_overlaid_photo(result, session)
             self.make_display_image(display_result)
+            with self.state_lock:
+                self.photo_wall_revision += 1
             queued = UPLOAD_QUEUE / f"{session['id']}-{result.name}.json"
             queued.write_text(json.dumps({
                 "file": str(result),
@@ -821,9 +833,11 @@ class PhotoboothService:
                     self.photo_number = 0
                     self.photo_total = 0
 
-    def capture_one(self):
+    def capture_one(self, sequence_frame=False):
         session = self.session
         folder = self.session_photo_dir(session)
+        if sequence_frame:
+            folder = folder / "sequence"
         folder.mkdir(parents=True, exist_ok=True)
         path = folder / f"{datetime.now().strftime('%Y%m%d-%H%M%S-%f')}.jpg"
         if self.demo:
