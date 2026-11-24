@@ -33,18 +33,24 @@ flock -n 9 || exit 0
 
 PROFILE_DIR="$HOME/.config/photobooth-kiosk-chromium"
 KIOSK_URL="http://127.0.0.1:8080"
-UNCLUTTER_PID=""
+CURSOR_HELPER_PID=""
 if [[ "${XDG_SESSION_TYPE:-}" == wayland || -n "${WAYLAND_DISPLAY:-}" ]]; then
   KIOSK_URL="$KIOSK_URL/?hide_cursor=1"
+  LABWC_CONFIG="${XDG_CONFIG_HOME:-$HOME/.config}/labwc/rc.xml"
+  if [[ -n "${LABWC_PID:-}" ]] && command -v swayidle >/dev/null && command -v wtype >/dev/null &&
+      grep -qsF '<!-- Photobooth cursor shortcut -->' "$LABWC_CONFIG"; then
+    swayidle -C /dev/null timeout 1 'wtype -M alt -M logo -k h -m logo -m alt' 9>&- &
+    CURSOR_HELPER_PID=$!
+  fi
 elif [[ -n "${DISPLAY:-}" ]] && command -v unclutter >/dev/null; then
   unclutter --start-hidden --timeout 1 --hide-on-touch 9>&- &
-  UNCLUTTER_PID=$!
+  CURSOR_HELPER_PID=$!
 fi
 
 cleanup() {
-  if [[ -n "$UNCLUTTER_PID" ]]; then
-    kill "$UNCLUTTER_PID" 2>/dev/null || true
-    wait "$UNCLUTTER_PID" 2>/dev/null || true
+  if [[ -n "$CURSOR_HELPER_PID" ]]; then
+    kill "$CURSOR_HELPER_PID" 2>/dev/null || true
+    wait "$CURSOR_HELPER_PID" 2>/dev/null || true
   fi
   rm -f "$KIOSK_RUNTIME_DIR/browser.pid"
 }

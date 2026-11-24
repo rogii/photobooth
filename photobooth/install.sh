@@ -14,6 +14,98 @@ sudo apt install -y python3 python3-venv python3-lgpio python3-gpiozero gphoto2 
 # The kiosk launcher manages unclutter instead of using Debian's session-wide autostart.
 sudo apt install -y --no-install-recommends unclutter-xfixes
 
+if command -v labwc >/dev/null; then
+  read -r _ LABWC_VERSION _ <<< "$(labwc --version)"
+  if dpkg --compare-versions "$LABWC_VERSION" ge 0.8.4; then
+    sudo apt install -y --no-install-recommends swayidle wtype
+    if python3 - <<'PY'
+import os
+import shutil
+import sys
+import tempfile
+from pathlib import Path
+from xml.dom import Node, minidom
+
+config_home = Path(os.environ.get("XDG_CONFIG_HOME") or Path.home() / ".config")
+config_dirs = (os.environ.get("XDG_CONFIG_DIRS") or "/etc/xdg").split(":")
+config = config_home / "labwc/rc.xml"
+system_configs = [Path(directory) / "labwc/rc.xml" for directory in config_dirs if directory]
+system_configs = [path for path in system_configs if path.is_file()]
+shortcut = "A-W-h"
+marker = " Photobooth cursor shortcut "
+
+def bindings(document):
+    return [
+        node for node in document.getElementsByTagNameNS("*", "keybind")
+        if sorted(node.getAttribute("key").lower().split("-")) == ["a", "h", "w"]
+    ]
+
+def hides_cursor(binding):
+    actions = [node for node in binding.childNodes if node.nodeType == Node.ELEMENT_NODE]
+    return (
+        len(actions) == 1
+        and actions[0].localName == "action"
+        and actions[0].getAttribute("name").lower() == "hidecursor"
+    )
+
+if config.is_symlink():
+    sys.exit(f"Labwc cursor setup requires a regular configuration file at {config}.")
+
+# Start with the system settings when creating a user override, including on
+# labwc sessions that run without --merge-config.
+source = config if config.exists() else next(iter(system_configs), None)
+document = minidom.parse(str(source)) if source else minidom.parseString("<labwc_config/>")
+root = document.documentElement
+if root.localName not in {"labwc_config", "openbox_config"}:
+    sys.exit(f"Unrecognized labwc configuration in {source}.")
+
+existing = bindings(document)
+if any(not hides_cursor(binding) for binding in existing):
+    sys.exit(f"The {shortcut} shortcut is already in use in {source}.")
+if not existing:
+    for path in system_configs:
+        if any(not hides_cursor(binding) for binding in bindings(minidom.parse(str(path)))):
+            sys.exit(f"The {shortcut} shortcut is already in use in {path}.")
+
+def new_element(name):
+    qualified_name = f"{root.prefix}:{name}" if root.prefix else name
+    return document.createElementNS(root.namespaceURI, qualified_name)
+
+if existing:
+    binding = existing[0]
+else:
+    keyboard = next(
+        (node for node in root.childNodes if node.nodeType == Node.ELEMENT_NODE and node.localName == "keyboard"),
+        None,
+    )
+    if keyboard is None:
+        keyboard = root.appendChild(new_element("keyboard"))
+    binding = keyboard.appendChild(new_element("keybind"))
+    binding.setAttribute("key", shortcut)
+    action = binding.appendChild(new_element("action"))
+    action.setAttribute("name", "HideCursor")
+
+has_marker = any(node.nodeType == Node.COMMENT_NODE and node.data == marker for node in binding.childNodes)
+if not has_marker:
+    binding.insertBefore(document.createComment(marker), binding.firstChild)
+
+if not has_marker or source != config:
+    config.parent.mkdir(parents=True, exist_ok=True)
+    with tempfile.TemporaryDirectory(dir=config.parent) as temp_dir:
+        pending = Path(temp_dir) / config.name
+        pending.write_bytes(document.toxml(encoding="UTF-8") + b"\n")
+        if config.exists():
+            shutil.copymode(config, pending)
+        pending.replace(config)
+PY
+    then
+      echo "Labwc cursor hiding is configured. Restart the desktop session to activate it."
+    else
+      echo "Labwc cursor setup was skipped. The Wayland kiosk page can still hide its pointer." >&2
+    fi
+  fi
+fi
+
 if ! getent group gpio >/dev/null; then
   sudo groupadd --system gpio
 fi
