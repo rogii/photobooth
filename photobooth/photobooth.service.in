@@ -7,7 +7,7 @@ Type=simple
 WorkingDirectory=@APP_DIR@
 Environment=PHOTOBOOTH_DATA=@USER_HOME@/Photobooth
 Environment=PYTHONUNBUFFERED=1
-ExecStart=@APP_DIR@/.venv/bin/python @APP_DIR@/app.py --host 0.0.0.0 --port 8080
+ExecStart=@APP_DIR@/.venv/bin/python @APP_DIR@/app.py --host 0.0.0.0 --port 8080 --manage-wifi
 Restart=always
 RestartSec=2
 KillSignal=SIGINT

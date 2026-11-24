@@ -25,6 +25,7 @@ from flask import Flask, jsonify, redirect, render_template, request, send_file,
 from PIL import Image, ImageDraw, ImageOps
 
 from selfie_button import SelfieButton
+from wifi import Wifi
 
 BASE = Path(__file__).resolve().parent
 CONFIG_PATH = BASE / "config.json"
@@ -87,7 +88,7 @@ def read_config():
 
 
 class PhotoboothService:
-    def __init__(self, demo=False):
+    def __init__(self, demo=False, manage_wifi=False):
         self.config = read_config()
         self.config.setdefault("capture_lead_seconds", 1.2)
         self.config.setdefault("admin_pin", "1234")
@@ -98,6 +99,7 @@ class PhotoboothService:
         self.camera_available = bool(demo)
         self.camera_error = "" if demo else "Checking camera connection…"
         self.stop_event = threading.Event()
+        self.wifi = Wifi(self.stop_event, enabled=manage_wifi and not demo)
         self.busy = False
         self.status = "Choose or create a session"
         self.countdown = ""
@@ -262,6 +264,7 @@ class PhotoboothService:
             return {
                 "disk": {"path": str(DATA), "used_bytes": used, "total_bytes": total, "free_bytes": free, "used_percent": percent},
                 "internet_connected": self.internet_connected,
+                "hotspot": self.wifi.status["hotspot"],
             }
 
     @staticmethod
@@ -1126,6 +1129,7 @@ def create_app(service, admin_port=ADMIN_PORT):
         regular_admin = {"admin", "save_config", "admin_event", "admin_session_lock", "admin_session_stop", "admin_session_hidden", "admin_session_delete", "admin_session_download", "admin_session_overlay", "admin_session_overlay_pause", "admin_capture", "restart_app", "get_admin_state"}
         local_admin = {"local_admin_page", "local_admin_photos", "local_admin_photo", "local_admin_delete_photos", "local_admin_shutdown", "local_admin_reboot", "local_admin_change_pin", "local_admin_exit_kiosk"}
         regular_admin.update({"admin_selfie_button", "admin_footer_logos", "admin_activate_footer_logo", "admin_remove_footer_logo", "admin_photos_page", "admin_photos", "admin_photo", "admin_delete_photos", "admin_shutdown"})
+        regular_admin.update({"admin_wifi_scan", "admin_wifi_connect"})
         if request.endpoint in regular_admin and int(request.environ.get("SERVER_PORT", 0)) != admin_port:
             return jsonify({"error": f"Open the admin interface on port {admin_port}"}), 404
         if request.endpoint in local_admin and not session.get("admin_unlocked"):
@@ -1134,12 +1138,14 @@ def create_app(service, admin_port=ADMIN_PORT):
                 return redirect(kiosk_url)
             return jsonify({"error": "Admin PIN required"}), 401
 
+    def valid_admin_pin(pin):
+        expected = str(service.config.get("admin_pin", "1234"))
+        return isinstance(pin, str) and hmac.compare_digest(pin.encode("utf-8", "surrogatepass"), expected.encode())
+
     @web.post("/api/admin/unlock")
     def admin_unlock():
-        payload = request.get_json(silent=True) or {}
-        expected = str(service.config.get("admin_pin", "1234"))
-        provided = str(payload.get("pin", ""))
-        if not hmac.compare_digest(provided.encode(), expected.encode()):
+        payload = request.get_json(silent=True)
+        if not isinstance(payload, dict) or not valid_admin_pin(str(payload.get("pin", ""))):
             return jsonify({"error": "Invalid PIN"}), 401
         session["admin_unlocked"] = True
         return jsonify({"unlocked": True})
@@ -1174,10 +1180,35 @@ def create_app(service, admin_port=ADMIN_PORT):
     @web.get("/api/admin/state")
     def get_admin_state():
         result = service.state()
+        boot_clock = getattr(time, "CLOCK_BOOTTIME", None)
+        result["host_info"]["uptime_seconds"] = time.clock_gettime(boot_clock) if boot_clock is not None else None
         result["sessions"] = service.list_sessions(include_hidden=True)
         result["footer_logos"] = service.list_footer_logos()
+        result["wifi"] = service.wifi.details()
         result["config"] = {key: service.config.get(key, "") for key in ("countdown_seconds", "sequence_countdown_seconds", "capture_lead_seconds", "sequence_interval_seconds", "idle_photo_wall_columns", "result_timeout_seconds", "camera_command", "upload_url", "gpio_flash_pin", "flash_seconds", "key_single", "key_sequence")}
         return jsonify(result)
+
+    @web.post("/api/admin/wifi/scan")
+    def admin_wifi_scan():
+        try:
+            return jsonify(service.wifi.scan())
+        except (RuntimeError, ValueError, OSError, subprocess.SubprocessError):
+            return jsonify({"error": "Wi-Fi scan unavailable. Enter the network name manually or try again."}), 503
+
+    @web.post("/api/admin/wifi/connect")
+    def admin_wifi_connect():
+        payload = request.get_json(silent=True)
+        if not isinstance(payload, dict) or not valid_admin_pin(payload.get("pin")):
+            return jsonify({"error": "Invalid admin PIN"}), 401
+        try:
+            service.wifi.connect(
+                payload.get("ssid"), payload.get("security"), payload.get("password", ""), payload.get("hidden", False),
+            )
+        except ValueError as exc:
+            return jsonify({"error": str(exc)}), 400
+        except RuntimeError as exc:
+            return jsonify({"error": str(exc)}), 409
+        return jsonify({"connecting": True}), 202
 
     @web.get("/api/admin/photos", endpoint="admin_photos")
     @web.get("/api/local-admin/photos")
@@ -1422,8 +1453,12 @@ def create_app(service, admin_port=ADMIN_PORT):
 
     @web.post("/api/config")
     def save_config():
+        payload = request.get_json(silent=True) or {}
+        if isinstance(payload, dict) and "admin_pin" in payload:
+            if not valid_admin_pin(payload.pop("current_admin_pin", None)):
+                return jsonify({"error": "Enter the current admin PIN to change it"}), 401
         try:
-            service.update_config(request.get_json(silent=True) or {})
+            service.update_config(payload)
             return jsonify({"saved": True})
         except (ValueError, TypeError, RuntimeError) as exc:
             return jsonify({"error": str(exc)}), 400
@@ -1507,8 +1542,9 @@ def main():
     parser.add_argument("--port", type=int, default=8080)
     parser.add_argument("--admin-port", type=int, default=8081)
     parser.add_argument("--demo", action="store_true", help="Use generated images instead of camera and GPIO")
+    parser.add_argument("--manage-wifi", action="store_true", help="Manage Wi-Fi through NetworkManager")
     args = parser.parse_args()
-    service = PhotoboothService(demo=args.demo)
+    service = PhotoboothService(demo=args.demo, manage_wifi=args.manage_wifi)
     from werkzeug.serving import make_server
     web = create_app(service, args.admin_port)
     server = make_server(args.host, args.port, web, threaded=True)

@@ -89,6 +89,14 @@ function render(current) {
   const selfieLabel = selfieStatus ? selfieStatus.toUpperCase() : "";
   if ($("#selfie-status").textContent !== selfieLabel) $("#selfie-status").textContent = selfieLabel;
   const online = !!current.host_info?.internet_connected;
+  const hotspot = current.host_info?.hotspot;
+  $("#hotspot-stat").classList.toggle("hidden", !hotspot);
+  $("#hotspot-divider").classList.toggle("hidden", !hotspot);
+  $("#picker-hotspot").classList.toggle("hidden", !hotspot);
+  const hotspotSsid = hotspot?.ssid || "";
+  const pickerHotspot = hotspot ? `Hotspot active · ${hotspot.ssid} · ${hotspot.ip}:8081` : "";
+  if ($("#hotspot-ssid").textContent !== hotspotSsid) $("#hotspot-ssid").textContent = hotspotSsid;
+  if ($("#picker-hotspot").textContent !== pickerHotspot) $("#picker-hotspot").textContent = pickerHotspot;
   $("#internet-status").textContent = online ? "ONLINE" : "OFFLINE";
   $("#internet-indicator").classList.toggle("offline", !online);
   const photoWall = $("#photo-wall");
