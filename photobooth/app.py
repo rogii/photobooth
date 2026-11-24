@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import hmac
+import io
 import json
 import os
 import shutil
@@ -34,6 +35,18 @@ NEXT_DISPLAY_FILE = DATA / "latest-display-next.jpg"
 LOCKED_SESSION = DATA / "locked-session.json"
 ADMIN_PORT = 8081
 SERVER_INSTANCE_ID = uuid.uuid4().hex
+ACCENT_COLORS = {
+    "green": "#e2fa83",
+    "blue": "#78baff",
+    "teal": "#5fe1d0",
+    "purple": "#c3a0ff",
+    "bright pink": "#ff62cb",
+    "red": "#ff7878",
+    "orange": "#ffab60",
+    "yellow": "#ffdf68",
+}
+DEFAULT_ACCENT = "green"
+FOOTER_LOGO_UPLOAD_LIMIT = 2 * 1024 * 1024
 
 
 def exit_kiosk_browser():
@@ -106,6 +119,14 @@ class PhotoboothService:
         self.host_info_lock = threading.Lock()
         self.internet_checked_at = 0.0
         self.internet_connected = False
+
+        self.footer_logo_dir = DATA / "footer-logos"
+        self.footer_logo_marker = self.footer_logo_dir / ".active"
+        self.active_footer_logo = None
+        try:
+            self.active_footer_logo = self.footer_logo_path(self.footer_logo_marker.read_text().strip()).name
+        except (OSError, ValueError):
+            pass
 
         DATA.mkdir(parents=True, exist_ok=True)
         SESSIONS.mkdir(parents=True, exist_ok=True)
@@ -224,6 +245,67 @@ class PhotoboothService:
     @staticmethod
     def session_from_item(item):
         return {key: item[key] for key in ("id", "name", "created_at", "hidden", "photo_dir", "overlay", "overlay_paused") if key in item}
+
+    def footer_logo_path(self, filename):
+        if not isinstance(filename, str) or Path(filename).name != filename or not filename.endswith(".png"):
+            raise ValueError("Footer logo not found")
+        path = self.footer_logo_dir / filename
+        if not path.is_file() or path.is_symlink():
+            raise ValueError("Footer logo not found")
+        return path
+
+    def list_footer_logos(self):
+        return [
+            {"id": path.name, "name": path.stem.partition("--")[2] or path.stem}
+            for path in sorted(self.footer_logo_dir.glob("*.png"))
+            if path.is_file() and not path.is_symlink()
+        ]
+
+    def add_footer_logo(self, upload):
+        if not upload or not upload.filename:
+            raise ValueError("Choose a PNG, JPEG, or WebP logo")
+        content = upload.stream.read(FOOTER_LOGO_UPLOAD_LIMIT + 1)
+        if len(content) > FOOTER_LOGO_UPLOAD_LIMIT:
+            raise ValueError("Choose a logo no larger than 2 MB")
+        try:
+            with Image.open(io.BytesIO(content), formats=("PNG", "JPEG", "WEBP")) as source:
+                if max(source.size) > 4096:
+                    raise ValueError("Logo dimensions must be 4096 pixels or smaller")
+                logo = ImageOps.exif_transpose(source).convert("RGBA")
+                # Fit both the footer and admin preview at 2x pixel density.
+                logo.thumbnail((192, 96), Image.Resampling.LANCZOS)
+                logo.info.clear()
+        except (OSError, Image.DecompressionBombError) as exc:
+            raise ValueError("Could not read the logo as a PNG, JPEG, or WebP image") from exc
+        name = self.safe_event_name(Path(upload.filename).stem)[:48].strip() or "Logo"
+        filename = f"{uuid.uuid4().hex}--{name}.png"
+        self.footer_logo_dir.mkdir(parents=True, exist_ok=True)
+        with tempfile.TemporaryDirectory(dir=self.footer_logo_dir) as temp_dir:
+            pending = Path(temp_dir) / "logo.png"
+            logo.save(pending, "PNG")
+            pending.replace(self.footer_logo_dir / filename)
+
+    def set_active_footer_logo(self, filename):
+        with self.state_lock:
+            self._set_active_footer_logo(filename)
+
+    def _set_active_footer_logo(self, filename):
+        if filename is None:
+            self.footer_logo_marker.unlink(missing_ok=True)
+        else:
+            self.footer_logo_path(filename)
+            with tempfile.TemporaryDirectory(dir=self.footer_logo_dir) as temp_dir:
+                pending = Path(temp_dir) / "active"
+                pending.write_text(filename, encoding="utf-8")
+                pending.replace(self.footer_logo_marker)
+        self.active_footer_logo = filename
+
+    def remove_footer_logo(self, filename):
+        with self.state_lock:
+            path = self.footer_logo_path(filename)
+            if filename == self.active_footer_logo:
+                self._set_active_footer_logo(None)
+            path.unlink()
 
     def session_overlay_path(self, session):
         if session.get("overlay_paused"):
@@ -553,6 +635,7 @@ class PhotoboothService:
                 "photo_total": self.photo_total,
                 "photo_wall_version": photo_wall_version,
                 "photo_wall_columns": photo_wall_columns,
+                "active_footer_logo": self.active_footer_logo,
                 "host_info": self.host_info(),
             }
 
@@ -583,32 +666,45 @@ class PhotoboothService:
         return safe[:80] or "Event"
 
     def update_config(self, values):
-        with self.state_lock:
-            if self.busy:
-                raise RuntimeError("Wait for the current capture to finish before changing settings")
+        accent = values.get("accent_color", DEFAULT_ACCENT)
+        if not isinstance(accent, str) or accent not in ACCENT_COLORS:
+            raise ValueError("Choose an available accent color")
         admin_pin = None
         if "admin_pin" in values:
             admin_pin = str(values["admin_pin"]).strip()
             if len(admin_pin) != 4 or not admin_pin.isascii() or not admin_pin.isdigit():
                 raise ValueError("Admin PIN must contain exactly four digits")
-        previous_gpio_pin = self.config.get("gpio_flash_pin", 17)
         allowed = {"countdown_seconds": (0, 30, int), "sequence_countdown_seconds": (0, 30, int), "capture_lead_seconds": (0, 5, float), "sequence_interval_seconds": (0, 10, float), "idle_photo_wall_columns": (1, 12, int), "result_timeout_seconds": (1, 300, int), "gpio_flash_pin": (0, 27, int), "flash_seconds": (0, 5, float)}
-        for key, (low, high, cast) in allowed.items():
-            if key in values:
-                self.config[key] = max(low, min(high, cast(values[key])))
-        for key in ("camera_command", "upload_url", "upload_token", "key_single", "key_sequence"):
-            if key in values:
-                self.config[key] = str(values[key]).strip()
-        if admin_pin is not None:
-            self.config["admin_pin"] = admin_pin
-        if self.config.get("gpio_flash_pin", 17) != previous_gpio_pin:
-            if self.flash:
-                self.flash.close()
-            self.flash = None
-            self.flash_available = False
-            self._init_gpio()
-        CONFIG_PATH.write_text(json.dumps(self.config, ensure_ascii=False, indent=2) + "\n")
-        return {key: self.config.get(key) for key in values if key != "upload_token"}
+        with self.state_lock:
+            if self.busy:
+                raise RuntimeError("Wait for the current capture to finish before changing settings")
+            config = self.config.copy()
+            for key, (low, high, cast) in allowed.items():
+                if key in values:
+                    config[key] = max(low, min(high, cast(values[key])))
+            for key in ("camera_command", "upload_url", "upload_token", "key_single", "key_sequence"):
+                if key in values:
+                    config[key] = str(values[key]).strip()
+            if admin_pin is not None:
+                config["admin_pin"] = admin_pin
+            if "accent_color" in values:
+                config["accent_color"] = accent
+            try:
+                with tempfile.TemporaryDirectory(dir=CONFIG_PATH.parent) as temp_dir:
+                    pending_config = Path(temp_dir) / CONFIG_PATH.name
+                    pending_config.write_text(json.dumps(config, ensure_ascii=False, indent=2) + "\n")
+                    pending_config.replace(CONFIG_PATH)
+            except OSError as exc:
+                raise RuntimeError("Could not save settings to config.json") from exc
+            previous_gpio_pin = self.config.get("gpio_flash_pin", 17)
+            self.config = config
+            if config.get("gpio_flash_pin", 17) != previous_gpio_pin:
+                if self.flash:
+                    self.flash.close()
+                self.flash = None
+                self.flash_available = False
+                self._init_gpio()
+            return {key: config.get(key) for key in values if key != "upload_token"}
 
     def set_status(self, value):
         with self.state_lock:
@@ -990,6 +1086,7 @@ def create_app(service, admin_port=ADMIN_PORT):
     def admin_routes():
         regular_admin = {"admin", "save_config", "admin_event", "admin_session_lock", "admin_session_stop", "admin_session_hidden", "admin_session_delete", "admin_session_download", "admin_session_overlay", "admin_session_overlay_pause", "admin_capture", "restart_app", "get_admin_state"}
         local_admin = {"local_admin_page", "local_admin_photos", "local_admin_photo", "local_admin_delete_photos", "local_admin_shutdown", "local_admin_change_pin", "local_admin_exit_kiosk"}
+        regular_admin.update({"admin_footer_logos", "admin_activate_footer_logo", "admin_remove_footer_logo"})
         if request.endpoint in regular_admin and int(request.environ.get("SERVER_PORT", 0)) != admin_port:
             return jsonify({"error": f"Open the admin interface on port {admin_port}"}), 404
         if request.endpoint in local_admin and not session.get("admin_unlocked"):
@@ -1022,10 +1119,20 @@ def create_app(service, admin_port=ADMIN_PORT):
     def local_admin_page():
         return send_from_directory(BASE / "static", "local-admin.html")
 
+    @web.get("/api/appearance")
+    def get_appearance():
+        accent = service.config.get("accent_color")
+        if not isinstance(accent, str) or accent not in ACCENT_COLORS:
+            accent = DEFAULT_ACCENT
+        response = jsonify({"accent_color": accent, "colors": ACCENT_COLORS})
+        response.headers["Cache-Control"] = "no-store"
+        return response
+
     @web.get("/api/admin/state")
     def get_admin_state():
         result = service.state()
         result["sessions"] = service.list_sessions(include_hidden=True)
+        result["footer_logos"] = service.list_footer_logos()
         result["config"] = {key: service.config.get(key, "") for key in ("countdown_seconds", "sequence_countdown_seconds", "capture_lead_seconds", "sequence_interval_seconds", "idle_photo_wall_columns", "result_timeout_seconds", "camera_command", "upload_url", "gpio_flash_pin", "flash_seconds", "key_single", "key_sequence")}
         return jsonify(result)
 
@@ -1133,6 +1240,47 @@ def create_app(service, admin_port=ADMIN_PORT):
         except (ValueError, RuntimeError) as exc:
             return jsonify({"error": str(exc)}), 400
 
+    @web.post("/api/admin/footer-logos")
+    def admin_footer_logos():
+        if request.content_length and request.content_length > FOOTER_LOGO_UPLOAD_LIMIT + 16 * 1024:
+            return jsonify({"error": "Choose a logo no larger than 2 MB"}), 413
+        try:
+            service.add_footer_logo(request.files.get("logo"))
+            return jsonify({"saved": True}), 201
+        except (ValueError, OSError) as exc:
+            return jsonify({"error": str(exc)}), 400
+
+    @web.post("/api/admin/footer-logos/active")
+    def admin_activate_footer_logo():
+        payload = request.get_json(silent=True)
+        if not isinstance(payload, dict) or "id" not in payload:
+            return jsonify({"error": "Choose a footer logo or deactivate it"}), 400
+        try:
+            service.set_active_footer_logo(payload["id"])
+            return jsonify({"saved": True})
+        except (ValueError, OSError) as exc:
+            return jsonify({"error": str(exc)}), 400
+
+    @web.post("/api/admin/footer-logos/remove")
+    def admin_remove_footer_logo():
+        payload = request.get_json(silent=True)
+        try:
+            service.remove_footer_logo(payload.get("id") if isinstance(payload, dict) else None)
+            return jsonify({"removed": True})
+        except (ValueError, OSError) as exc:
+            return jsonify({"error": str(exc)}), 400
+
+    @web.get("/api/footer-logos/<filename>")
+    def footer_logo_file(filename):
+        on_admin_port = int(request.environ.get("SERVER_PORT", 0)) == admin_port
+        if not on_admin_port and filename != service.active_footer_logo:
+            return jsonify({"error": "Footer logo not found"}), 404
+        try:
+            path = service.footer_logo_path(filename)
+            return send_file(path, mimetype="image/png", max_age=0)
+        except (ValueError, FileNotFoundError):
+            return jsonify({"error": "Footer logo not found"}), 404
+
     @web.post("/api/admin/session-overlay/<session_id>")
     def admin_session_overlay(session_id):
         try:
@@ -1177,6 +1325,8 @@ def create_app(service, admin_port=ADMIN_PORT):
 
     @web.get("/api/photos/<event>/<path:filename>")
     def photo_file(event, filename):
+        if event == service.footer_logo_dir.name:
+            return jsonify({"error": "Photo not found"}), 404
         return send_from_directory(DATA / event, filename)
 
     @web.get("/api/photo-wall")
@@ -1201,7 +1351,7 @@ def create_app(service, admin_port=ADMIN_PORT):
     @web.get("/api/state")
     def get_state():
         state = service.state()
-        public = {key: state[key] for key in ("session", "busy", "status", "countdown", "photo_number", "photo_total", "recent_photo", "recent_photo_version", "phase", "photo_wall_version", "photo_wall_columns", "capture_count", "queued_uploads", "gallery_upload_configured", "sessions", "locked_session", "host_info", "camera_available", "camera_error")}
+        public = {key: state[key] for key in ("session", "busy", "status", "countdown", "photo_number", "photo_total", "recent_photo", "recent_photo_version", "phase", "photo_wall_version", "photo_wall_columns", "active_footer_logo", "capture_count", "queued_uploads", "gallery_upload_configured", "sessions", "locked_session", "host_info", "camera_available", "camera_error")}
         public["server_instance_id"] = SERVER_INSTANCE_ID
         public["admin_pin_length"] = len(str(service.config.get("admin_pin", "1234")))
         public["keys"] = {"single": service.config.get("key_single", "a"), "sequence": service.config.get("key_sequence", "b")}

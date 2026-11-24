@@ -58,6 +58,14 @@ function render(current) {
   $("#camera-error").classList.toggle("hidden", !cameraFailed);
   $("#camera-error-detail").textContent = current.camera_error || "The camera is not responding.";
   $("#event").textContent = current.session?.name || "";
+  const logo = $("#footer-logo");
+  if (current.active_footer_logo) {
+    const url = `/api/footer-logos/${encodeURIComponent(current.active_footer_logo)}`;
+    if (logo.getAttribute("src") !== url) logo.src = url;
+  } else {
+    logo.removeAttribute("src");
+  }
+  logo.classList.toggle("hidden", !current.active_footer_logo);
   $("#event-footer").classList.toggle("hidden", !current.session || current.phase !== "idle");
   $("#capture-count").textContent = Number(current.capture_count || 0).toLocaleString();
   const queuedUploads = Number(current.queued_uploads || 0);

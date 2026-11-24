@@ -1,4 +1,5 @@
 {
+  "accent_color": "green",
   "camera_command": "gphoto2",
   "upload_url": "",
   "upload_token": "",
