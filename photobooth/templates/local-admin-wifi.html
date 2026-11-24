@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Wi-Fi setup · Photobooth Local Admin</title>
+  <link rel="stylesheet" href="/static/appearance.css">
+  <link rel="stylesheet" href="/static/local-admin.css">
+  <link rel="stylesheet" href="/static/local-admin-wifi.css">
+  <script src="/static/appearance.js" defer></script>
+  <script src="/static/local-admin-wifi.js" defer></script>
+</head>
+<body>
+  <main class="wrap wifi-wrap">
+    <section id="wifi-setup" aria-labelledby="wifi-title">
+      <header class="topbar">
+        <h1 id="wifi-title">Wi-Fi setup</h1>
+        <a class="button secondary" href="{{ url_for('local_admin_page') }}">Back to local admin</a>
+      </header>
+      <div class="card">
+        <p id="wifi-status" role="status">Checking Wi-Fi…</p>
+        <p id="wifi-result" class="muted" role="status"></p>
+        <fieldset id="wifi-fields" class="wifi-fields" aria-label="Network settings" disabled>
+          <button id="wifi-scan" class="secondary" type="button">Scan for networks</button>
+          <label for="wifi-networks">Nearby networks</label>
+          <select id="wifi-networks"><option value="">Enter a network manually</option></select>
+          <label for="wifi-ssid">Network name</label>
+          <button id="wifi-ssid" class="secondary wifi-field-button" type="button">Enter network name</button>
+          <label for="wifi-security">Security</label>
+          <select id="wifi-security">
+            <option value="wpa-psk">WPA/WPA2 Personal</option>
+            <option value="sae">WPA3 Personal</option>
+            <option value="open">Open</option>
+          </select>
+          <div id="wifi-password-field" class="wifi-field">
+            <label for="wifi-password">Wi-Fi password</label>
+            <button id="wifi-password" class="secondary wifi-field-button" type="button">Enter Wi-Fi password</button>
+          </div>
+          <label class="wifi-hidden"><input id="wifi-hidden" type="checkbox"> Hidden network</label>
+          <button id="wifi-connect" type="button" disabled>Join network</button>
+        </fieldset>
+        <p id="wifi-message" class="muted" role="status"></p>
+      </div>
+    </section>
+    <section id="wifi-editor" aria-labelledby="wifi-editor-title" hidden>
+      <header class="topbar">
+        <h1 id="wifi-editor-title"></h1>
+        <button id="wifi-editor-cancel" class="secondary" type="button">Cancel</button>
+      </header>
+      <form id="wifi-editor-form" class="card wifi-editor-form">
+        <input id="wifi-editor-input" aria-labelledby="wifi-editor-title" autocomplete="off" autocapitalize="off" spellcheck="false" inputmode="none" required>
+        <div id="wifi-keyboard" class="wifi-keyboard" role="group" aria-label="On-screen keyboard"></div>
+        <p id="wifi-editor-error" class="error" role="status"></p>
+        <button type="submit">Done</button>
+      </form>
+    </section>
+  </main>
+</body>
+</html>
