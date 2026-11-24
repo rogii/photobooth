@@ -36,6 +36,11 @@ async function refresh() {
     $("#remove-overlay").disabled = !overlaySession || !overlaySession.overlay || state.busy;
     $("#pause-overlay").textContent = overlaySession?.overlay_paused ? "Resume overlay" : "Pause overlay";
     $("#pause-overlay").disabled = !overlaySession || !overlaySession.overlay || state.busy;
+    selfieConfigured = state.selfie_button_configured;
+    selfieForget.disabled = selfieUpdating || !selfieConfigured;
+    $("#selfie-connection").textContent = state.selfie_button_connected
+      ? "Selfie button connected"
+      : state.selfie_button_configured ? "Selfie button disconnected" : "No selfie button selected";
     renderHost(state.host_info || {});
     const captureDisabled = !state.session || state.busy;
     $("#capture-one").disabled = captureDisabled;
@@ -305,6 +310,97 @@ shutdownDialog.addEventListener("close", async () => {
     shutdownButton.disabled = false;
   }
 });
+
+const selfieScan = $("#selfie-scan");
+const selfieDevice = $("#selfie-device");
+const selfiePair = $("#selfie-pair");
+const selfieForget = $("#selfie-forget");
+const selfieMessage = $("#selfie-message");
+const selfiePath = "/api/admin/selfie-button";
+let selfieScanTimer;
+let selfieScanDeadline = 0;
+let selfieUpdating = false;
+let selfieConfigured = false;
+let selfieDevices = "";
+
+async function listSelfieDevices() {
+  try {
+    const { devices } = await api(selfiePath);
+    if (selfieUpdating) return;
+    const deviceList = JSON.stringify(devices);
+    if (deviceList !== selfieDevices) {
+      const selected = selfieDevice.value;
+      selfieDevice.replaceChildren(new Option("Choose a device", ""));
+      for (const { name, address } of devices) {
+        selfieDevice.add(new Option(name === address ? address : name + " (" + address + ")", address));
+      }
+      selfieDevice.value = devices.some(({ address }) => address === selected) ? selected : "";
+      selfieDevices = deviceList;
+    }
+    selfieDevice.disabled = !devices.length;
+    selfiePair.disabled = !selfieDevice.value;
+    if (Date.now() < selfieScanDeadline) {
+      selfieScanTimer = setTimeout(listSelfieDevices, 2000);
+    } else {
+      selfieMessage.textContent = devices.length ? "Scan complete." : "No devices found. Check pairing mode and scan again.";
+    }
+  } catch (error) {
+    selfieMessage.textContent = error.message;
+  }
+}
+
+selfieScan.addEventListener("click", async () => {
+  clearTimeout(selfieScanTimer);
+  selfieScan.disabled = true;
+  selfieMessage.textContent = "Scanning for Bluetooth devices…";
+  try {
+    await api(selfiePath, { scan: true });
+    selfieScanDeadline = Date.now() + 43000;
+    await listSelfieDevices();
+  } catch (error) {
+    selfieMessage.textContent = error.message;
+  } finally {
+    selfieScan.disabled = selfieUpdating;
+  }
+});
+
+selfieDevice.addEventListener("change", () => { selfiePair.disabled = !selfieDevice.value; });
+$("#selfie-form").addEventListener("submit", (event) => {
+  event.preventDefault();
+  const address = selfieDevice.value;
+  if (!address) return;
+  updateSelfieButton({ address }, "Pairing or reconnecting…",
+    "Button saved. Press it once to test a single capture in the active session.");
+});
+
+selfieForget.addEventListener("click", () => {
+  updateSelfieButton({ forget: true }, "Forgetting selfie button…", "Selfie button forgotten.");
+});
+
+async function updateSelfieButton(body, pendingMessage, successMessage) {
+  if (selfieUpdating) return;
+  clearTimeout(selfieScanTimer);
+  selfieUpdating = true;
+  selfieScan.disabled = selfieDevice.disabled = selfiePair.disabled = selfieForget.disabled = true;
+  selfieMessage.textContent = pendingMessage;
+  try {
+    await api(selfiePath, body);
+    if (body.forget) {
+      selfieDevice.replaceChildren();
+      selfieDevices = "";
+    }
+    selfieMessage.textContent = successMessage;
+    await refresh();
+  } catch (error) {
+    selfieMessage.textContent = error.message;
+  } finally {
+    selfieUpdating = false;
+    selfieScan.disabled = false;
+    selfieDevice.disabled = selfieDevice.options.length <= 1;
+    selfiePair.disabled = !selfieDevice.value;
+    selfieForget.disabled = !selfieConfigured;
+  }
+}
 
 refresh();
 setInterval(refresh, 2000);

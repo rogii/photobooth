@@ -83,6 +83,11 @@ function render(current) {
     ? "GALLERY UPLOAD OFF"
     : queuedUploads > 0 ? "GALLERY UPLOADS PENDING" : "GALLERY UP TO DATE";
   $("#upload-count").textContent = queuedUploads > 0 ? `${queuedUploads} queued` : "";
+  const selfieStatus = current.selfie_button_status;
+  $("#selfie-stat").classList.toggle("hidden", !selfieStatus);
+  $("#selfie-divider").classList.toggle("hidden", !selfieStatus);
+  const selfieLabel = selfieStatus ? selfieStatus.toUpperCase() : "";
+  if ($("#selfie-status").textContent !== selfieLabel) $("#selfie-status").textContent = selfieLabel;
   const online = !!current.host_info?.internet_connected;
   $("#internet-status").textContent = online ? "ONLINE" : "OFFLINE";
   $("#internet-indicator").classList.toggle("offline", !online);
