@@ -26,20 +26,42 @@ EOF
 systemctl --user mask --now gvfs-gphoto2-volume-monitor.service
 
 SERVICE_DIR="$USER_HOME/.config/systemd/user"
-AUTOSTART_DIR="$USER_HOME/.config/autostart"
-mkdir -p "$SERVICE_DIR" "$AUTOSTART_DIR"
+mkdir -p "$SERVICE_DIR"
 sed -e "s|@APP_DIR@|$APP_DIR|g" -e "s|@USER_HOME@|$USER_HOME|g" \
   "$APP_DIR/photobooth.service.in" > "$SERVICE_DIR/photobooth.service"
 
-cat > "$AUTOSTART_DIR/photobooth.desktop" <<EOF
+AUTOSTART_DIR="${XDG_CONFIG_HOME:-$USER_HOME/.config}/autostart"
+APPLICATIONS_DIR="${XDG_DATA_HOME:-$USER_HOME/.local/share}/applications"
+DESKTOP_DIR="$USER_HOME/Desktop"
+if command -v xdg-user-dir >/dev/null; then
+  DESKTOP_DIR="$(xdg-user-dir DESKTOP)"
+fi
+
+# Exec is quoted first for the launcher, then escaped for the desktop entry file.
+KIOSK_EXEC="$APP_DIR/launch-kiosk.sh"
+KIOSK_EXEC=${KIOSK_EXEC//\\/\\\\}
+KIOSK_EXEC=${KIOSK_EXEC//\"/\\\"}
+KIOSK_EXEC=${KIOSK_EXEC//\$/\\\$}
+KIOSK_EXEC=${KIOSK_EXEC//\`/\\\`}
+KIOSK_EXEC=${KIOSK_EXEC//\\/\\\\}
+KIOSK_EXEC=${KIOSK_EXEC//%/%%}
+
+mkdir -p "$AUTOSTART_DIR" "$APPLICATIONS_DIR"
+KIOSK_ENTRY="$APPLICATIONS_DIR/photobooth.desktop"
+cat > "$KIOSK_ENTRY" <<EOF
 [Desktop Entry]
 Type=Application
-Name=Photobooth
+Name=Photobooth Kiosk
 Comment=Open the photobooth kiosk browser
-Exec=$APP_DIR/launch-kiosk.sh
+Exec="$KIOSK_EXEC"
+Icon=camera-photo
 Terminal=false
-X-GNOME-Autostart-enabled=true
+Categories=Graphics;Photography;
 EOF
+install -m 0644 "$KIOSK_ENTRY" "$AUTOSTART_DIR/photobooth.desktop"
+if [[ -n "$DESKTOP_DIR" && "${DESKTOP_DIR%/}" != "${USER_HOME%/}" ]]; then
+  install -D -m 0755 "$KIOSK_ENTRY" "$DESKTOP_DIR/photobooth.desktop"
+fi
 
 systemctl --user daemon-reload
 systemctl --user enable --now photobooth.service
