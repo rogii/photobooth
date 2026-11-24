@@ -34,6 +34,17 @@ NEXT_DISPLAY_FILE = DATA / "latest-display-next.jpg"
 LOCKED_SESSION = DATA / "locked-session.json"
 ADMIN_PORT = 8081
 SERVER_INSTANCE_ID = uuid.uuid4().hex
+ACCENT_COLORS = {
+    "green": "#e2fa83",
+    "blue": "#78baff",
+    "teal": "#5fe1d0",
+    "purple": "#c3a0ff",
+    "bright pink": "#ff62cb",
+    "red": "#ff7878",
+    "orange": "#ffab60",
+    "yellow": "#ffdf68",
+}
+DEFAULT_ACCENT = "green"
 
 
 def exit_kiosk_browser():
@@ -583,32 +594,45 @@ class PhotoboothService:
         return safe[:80] or "Event"
 
     def update_config(self, values):
-        with self.state_lock:
-            if self.busy:
-                raise RuntimeError("Wait for the current capture to finish before changing settings")
+        accent = values.get("accent_color", DEFAULT_ACCENT)
+        if not isinstance(accent, str) or accent not in ACCENT_COLORS:
+            raise ValueError("Choose an available accent color")
         admin_pin = None
         if "admin_pin" in values:
             admin_pin = str(values["admin_pin"]).strip()
             if len(admin_pin) != 4 or not admin_pin.isascii() or not admin_pin.isdigit():
                 raise ValueError("Admin PIN must contain exactly four digits")
-        previous_gpio_pin = self.config.get("gpio_flash_pin", 17)
         allowed = {"countdown_seconds": (0, 30, int), "sequence_countdown_seconds": (0, 30, int), "capture_lead_seconds": (0, 5, float), "sequence_interval_seconds": (0, 10, float), "idle_photo_wall_columns": (1, 12, int), "result_timeout_seconds": (1, 300, int), "gpio_flash_pin": (0, 27, int), "flash_seconds": (0, 5, float)}
-        for key, (low, high, cast) in allowed.items():
-            if key in values:
-                self.config[key] = max(low, min(high, cast(values[key])))
-        for key in ("camera_command", "upload_url", "upload_token", "key_single", "key_sequence"):
-            if key in values:
-                self.config[key] = str(values[key]).strip()
-        if admin_pin is not None:
-            self.config["admin_pin"] = admin_pin
-        if self.config.get("gpio_flash_pin", 17) != previous_gpio_pin:
-            if self.flash:
-                self.flash.close()
-            self.flash = None
-            self.flash_available = False
-            self._init_gpio()
-        CONFIG_PATH.write_text(json.dumps(self.config, ensure_ascii=False, indent=2) + "\n")
-        return {key: self.config.get(key) for key in values if key != "upload_token"}
+        with self.state_lock:
+            if self.busy:
+                raise RuntimeError("Wait for the current capture to finish before changing settings")
+            config = self.config.copy()
+            for key, (low, high, cast) in allowed.items():
+                if key in values:
+                    config[key] = max(low, min(high, cast(values[key])))
+            for key in ("camera_command", "upload_url", "upload_token", "key_single", "key_sequence"):
+                if key in values:
+                    config[key] = str(values[key]).strip()
+            if admin_pin is not None:
+                config["admin_pin"] = admin_pin
+            if "accent_color" in values:
+                config["accent_color"] = accent
+            try:
+                with tempfile.TemporaryDirectory(dir=CONFIG_PATH.parent) as temp_dir:
+                    pending_config = Path(temp_dir) / CONFIG_PATH.name
+                    pending_config.write_text(json.dumps(config, ensure_ascii=False, indent=2) + "\n")
+                    pending_config.replace(CONFIG_PATH)
+            except OSError as exc:
+                raise RuntimeError("Could not save settings to config.json") from exc
+            previous_gpio_pin = self.config.get("gpio_flash_pin", 17)
+            self.config = config
+            if config.get("gpio_flash_pin", 17) != previous_gpio_pin:
+                if self.flash:
+                    self.flash.close()
+                self.flash = None
+                self.flash_available = False
+                self._init_gpio()
+            return {key: config.get(key) for key in values if key != "upload_token"}
 
     def set_status(self, value):
         with self.state_lock:
@@ -1021,6 +1045,15 @@ def create_app(service, admin_port=ADMIN_PORT):
     @web.get("/local-admin")
     def local_admin_page():
         return send_from_directory(BASE / "static", "local-admin.html")
+
+    @web.get("/api/appearance")
+    def get_appearance():
+        accent = service.config.get("accent_color")
+        if not isinstance(accent, str) or accent not in ACCENT_COLORS:
+            accent = DEFAULT_ACCENT
+        response = jsonify({"accent_color": accent, "colors": ACCENT_COLORS})
+        response.headers["Cache-Control"] = "no-store"
+        return response
 
     @web.get("/api/admin/state")
     def get_admin_state():

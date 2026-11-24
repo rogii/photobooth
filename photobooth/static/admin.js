@@ -113,6 +113,22 @@ $("#event-form").addEventListener("submit", async (event) => {
   }
 });
 
+$("#accent-form").addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const selector = $("#accent-color");
+  const button = event.currentTarget.querySelector("button");
+  const message = $("#accent-message");
+  button.disabled = true;
+  try {
+    await api("/api/config", { accent_color: selector.value });
+    message.textContent = "Accent color saved";
+  } catch (error) {
+    message.textContent = error.message;
+  } finally {
+    button.disabled = false;
+  }
+});
+
 $("#settings-form").addEventListener("submit", async (event) => {
   event.preventDefault();
   const settings = Object.fromEntries(new FormData(event.currentTarget));
