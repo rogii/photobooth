@@ -315,7 +315,11 @@ adminAccess.addEventListener("keydown", (event) => {
 });
 ["keyup", "blur"].forEach((name) => adminAccess.addEventListener(name, cancelAdminHold));
 
-$("#admin-pin-back").addEventListener("click", () => $("#admin-pin-dialog").classList.add("hidden"));
+const adminPinDialog = $("#admin-pin-dialog");
+adminPinDialog.addEventListener("click", (event) => {
+  if (event.target !== adminPinDialog || adminPinKeypad.isPending()) return;
+  adminPinDialog.classList.add("hidden");
+});
 const adminPinKeypad = setupPinKeypad($("#admin-pin-form"), async (pin) => {
   try {
     await api("/api/admin/unlock", { pin });
