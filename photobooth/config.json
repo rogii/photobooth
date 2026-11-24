@@ -1,6 +1,7 @@
 {
   "accent_color": "green",
   "camera_command": "gphoto2",
+  "save_on_camera": false,
   "upload_url": "",
   "upload_token": "",
   "gpio_flash_pin": 17,

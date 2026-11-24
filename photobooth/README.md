@@ -65,6 +65,8 @@ gphoto2 --capture-preview --filename /tmp/preview.jpg
 
 Change the single-photo countdown, the separate countdown before each frame in a four-photo sequence, camera pre-trigger, interval, number of columns in the idle Photo Wall, and display time in the admin panel. Camera pre-trigger starts the gPhoto2 command the selected number of seconds before the countdown reaches zero; it can be calibrated separately for the camera and environment. Changes are saved persistently to `config.json`. Other hardware and upload settings remain in the same file.
 
+In **Persistent settings** on port 8081, set **Save captures on camera** to **On** and select **Save settings** to keep a copy of each captured photo on the camera’s memory card. This includes each individual frame of a four-photo sequence. The booth downloads photos in both modes. The setting defaults to **Off**.
+
 The installer must be run as the desktop user because it installs a user service and an autostart file in that user's home directory.
 
 ## Wi-Fi setup and fallback hotspot
