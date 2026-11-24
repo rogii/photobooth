@@ -32,6 +32,8 @@ async function refresh() {
     $("#overlay-file").disabled = !overlaySession || state.busy;
     $("#overlay-form button").disabled = !overlaySession || state.busy;
     $("#remove-overlay").disabled = !overlaySession || !overlaySession.overlay || state.busy;
+    $("#pause-overlay").textContent = overlaySession?.overlay_paused ? "Resume overlay" : "Pause overlay";
+    $("#pause-overlay").disabled = !overlaySession || !overlaySession.overlay || state.busy;
     renderHost(state.host_info || {});
     const captureDisabled = !state.session || state.busy;
     $("#capture-one").disabled = captureDisabled;
@@ -148,6 +150,16 @@ $("#overlay-form").addEventListener("submit", async (event) => {
 });
 $("#remove-overlay").addEventListener("click", async () => {
   try { await saveOverlay(true); } catch (error) { say(error.message); }
+});
+$("#pause-overlay").addEventListener("click", async () => {
+  try {
+    const state = await api("/api/admin/state");
+    if (!state.session?.overlay) throw new Error("Choose a session with an overlay first");
+    const paused = !state.session.overlay_paused;
+    await api(`/api/admin/session-overlay/${encodeURIComponent(state.session.id)}/pause`, { paused });
+    say(paused ? "Overlay paused for future captures" : "Overlay resumed for future captures");
+    refresh();
+  } catch (error) { say(error.message); }
 });
 
 async function capture(count) {
