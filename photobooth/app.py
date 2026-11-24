@@ -708,6 +708,8 @@ class PhotoboothService:
             admin_pin = str(values["admin_pin"]).strip()
             if len(admin_pin) != 4 or not admin_pin.isascii() or not admin_pin.isdigit():
                 raise ValueError("Admin PIN must contain exactly four digits")
+        if "save_on_camera" in values and not isinstance(values["save_on_camera"], bool):
+            raise ValueError("Save captures on camera must be true or false")
         allowed = {"countdown_seconds": (0, 30, int), "sequence_countdown_seconds": (0, 30, int), "capture_lead_seconds": (0, 5, float), "sequence_interval_seconds": (0, 10, float), "idle_photo_wall_columns": (1, 12, int), "result_timeout_seconds": (1, 300, int), "gpio_flash_pin": (0, 27, int), "flash_seconds": (0, 5, float)}
         with self.state_lock:
             if self.busy:
@@ -723,6 +725,8 @@ class PhotoboothService:
                 config["admin_pin"] = admin_pin
             if "accent_color" in values:
                 config["accent_color"] = accent
+            if "save_on_camera" in values:
+                config["save_on_camera"] = values["save_on_camera"]
             try:
                 with tempfile.TemporaryDirectory(dir=CONFIG_PATH.parent) as temp_dir:
                     pending_config = Path(temp_dir) / CONFIG_PATH.name
@@ -1013,9 +1017,13 @@ class PhotoboothService:
         command = self.config.get("camera_command", "gphoto2")
         if not shutil.which(command):
             raise RuntimeError(f"Cannot find {command}; install gPhoto2")
+        if self.config.get("save_on_camera") is True:
+            camera_options = ["--set-config-index", "capturetarget=1", "--keep"]
+        else:
+            camera_options = ["--no-keep"]
         with self.camera_lock:
             result = subprocess.run(
-                [command, "--capture-image-and-download", "--filename", str(path)],
+                [command, *camera_options, "--capture-image-and-download", "--filename", str(path)],
                 capture_output=True,
                 text=True,
                 timeout=90,
@@ -1186,6 +1194,7 @@ def create_app(service, admin_port=ADMIN_PORT):
         result["footer_logos"] = service.list_footer_logos()
         result["wifi"] = service.wifi.details()
         result["config"] = {key: service.config.get(key, "") for key in ("countdown_seconds", "sequence_countdown_seconds", "capture_lead_seconds", "sequence_interval_seconds", "idle_photo_wall_columns", "result_timeout_seconds", "camera_command", "upload_url", "gpio_flash_pin", "flash_seconds", "key_single", "key_sequence")}
+        result["config"]["save_on_camera"] = service.config.get("save_on_camera") is True
         return jsonify(result)
 
     @web.post("/api/admin/wifi/scan")

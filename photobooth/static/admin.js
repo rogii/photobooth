@@ -267,7 +267,7 @@ settingsForm.addEventListener("submit", async (event) => {
     delete settings.current_admin_pin;
   }
   try {
-    await api("/api/config", settings);
+    await api("/api/config", { ...settings, save_on_camera: settings.save_on_camera === "true" });
     event.target.elements.admin_pin.value = "";
     event.target.elements.current_admin_pin.value = "";
     for (const [key, value] of Object.entries(settings)) {
