@@ -56,6 +56,9 @@ async function api(path, body) {
 
 function render(current) {
   state = current;
+  const cameraFailed = !current.demo && !current.camera_available;
+  $("#camera-error").classList.toggle("hidden", !cameraFailed);
+  $("#camera-error-detail").textContent = current.camera_error || "The camera is not responding.";
   $("#event").textContent = current.session?.name || "";
   $("#event-footer").classList.toggle("hidden", !current.session || current.phase === "result");
   $("#capture-count").textContent = Number(current.capture_count || 0).toLocaleString();
