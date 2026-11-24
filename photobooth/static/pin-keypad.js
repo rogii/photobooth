@@ -1,61 +1,74 @@
 function setupPinKeypad(form, onComplete) {
   const input = form.querySelector("input");
+  const progress = form.querySelector(".admin-pin-progress");
   const pad = form.querySelector(".admin-pin-pad");
   const error = form.querySelector(".admin-pin-error");
   let length = 4;
+  let digits = "";
   let pending = false;
+
+  function renderDigits() {
+    if (input) input.value = digits;
+    if (progress) progress.value = "●".repeat(digits.length) + "○".repeat(length - digits.length);
+  }
+
+  function focusKeypad() {
+    (input ?? form).focus();
+  }
 
   function reset(newLength = length) {
     length = newLength;
-    input.maxLength = length;
-    input.value = "";
+    if (input) input.maxLength = length;
+    digits = "";
+    renderDigits();
     error.textContent = "";
-    input.focus();
+    focusKeypad();
   }
 
-  async function checkInput() {
-    input.value = input.value.replace(/[^0-9]/g, "").slice(0, length);
+  async function updateDigits(value) {
+    if (pending) return;
+    digits = value.replace(/[^0-9]/g, "").slice(0, length);
+    renderDigits();
     error.textContent = "";
-    if (pending || input.value.length !== length) return;
+    if (digits.length !== length) return;
 
     pending = true;
     const controls = [...form.querySelectorAll("input, button")];
     controls.forEach((control) => { control.disabled = true; });
     try {
-      await onComplete(input.value);
+      await onComplete(digits);
     } catch (failure) {
       error.textContent = failure.message;
     } finally {
-      input.value = "";
+      digits = "";
+      renderDigits();
       controls.forEach((control) => { control.disabled = false; });
       pending = false;
-      input.focus();
+      focusKeypad();
     }
   }
 
-  for (const digit of "1234567890") {
-    const button = document.createElement("button");
-    button.type = "button";
-    button.dataset.digit = digit;
-    button.textContent = digit;
-    button.addEventListener("click", () => {
-      input.value += digit;
-      checkInput();
+  pad.addEventListener("click", (event) => {
+    const button = event.target.closest("button");
+    if (!button) return;
+    updateDigits(button.hasAttribute("data-backspace") ? digits.slice(0, -1) : digits + button.dataset.digit);
+  });
+
+  if (input) {
+    input.addEventListener("input", () => updateDigits(input.value));
+  } else {
+    form.addEventListener("keydown", (event) => {
+      if (event.altKey || event.ctrlKey || event.metaKey) return;
+      if (event.key === "Backspace") {
+        event.preventDefault();
+        updateDigits(digits.slice(0, -1));
+      } else if (/^[0-9]$/.test(event.key)) {
+        event.preventDefault();
+        updateDigits(digits + event.key);
+      }
     });
-    pad.append(button);
   }
 
-  const backspace = document.createElement("button");
-  backspace.type = "button";
-  backspace.textContent = "⌫";
-  backspace.setAttribute("aria-label", "Backspace");
-  backspace.addEventListener("click", () => {
-    input.value = input.value.slice(0, -1);
-    checkInput();
-  });
-  pad.append(backspace);
-
-  input.addEventListener("input", checkInput);
   form.addEventListener("submit", (event) => event.preventDefault());
   return { reset, isPending: () => pending };
 }

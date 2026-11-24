@@ -14,3 +14,21 @@
 dialog.admin-pin-card::backdrop{background:color-mix(in srgb, var(--scrim) 94%, transparent)}
 .admin-pin-pad [data-digit="0"]{grid-column:2}
 .admin-pin-pad button:disabled,.admin-pin-actions button:disabled{opacity:.5}
+
+.admin-pin-progress{display:block;color:var(--text);font:20px ui-monospace,monospace;letter-spacing:.35em;text-align:center}
+#admin-pin-form{--pin-key-size:clamp(44px,calc((100dvh - 116px) / 4),76px);padding:12px;text-align:center}
+#admin-pin-form:focus{outline:none}
+#admin-pin-form h1{margin:0 0 6px;font-size:12px}
+#admin-pin-form .admin-pin-pad{grid-template-columns:repeat(3,var(--pin-key-size));justify-content:center;gap:6px;margin-top:8px}
+#admin-pin-form .admin-pin-pad button{width:var(--pin-key-size);height:var(--pin-key-size);padding:0;border-radius:50%;font:600 24px system-ui,sans-serif;touch-action:manipulation}
+#admin-pin-form .admin-pin-pad button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+#admin-pin-form .admin-pin-error{margin-top:4px;min-height:16px}
+
+@media(max-height:460px){
+  .admin-pin-overlay{padding:6px}
+  #admin-pin-form{padding:6px;max-height:calc(100dvh - 12px)}
+  #admin-pin-form h1{margin-bottom:2px}
+  #admin-pin-form .admin-pin-progress{line-height:20px}
+  #admin-pin-form .admin-pin-pad{gap:3px;margin-top:3px}
+  #admin-pin-form .admin-pin-error{margin-top:2px}
+}

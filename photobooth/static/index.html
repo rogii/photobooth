@@ -76,20 +76,29 @@
       </section>
     </div>
     <div id="admin-pin-dialog" class="admin-pin-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="admin-pin-title">
-      <form id="admin-pin-form" class="admin-pin-card">
-        <span class="picker-kicker">ADMIN ACCESS</span>
-        <h1 id="admin-pin-title">Enter PIN</h1>
-        <p>Enter the admin PIN to continue.</p>
-        <input id="admin-pin-input" type="password" inputmode="numeric" maxlength="12" autocomplete="current-password" aria-label="Admin PIN">
-        <div class="admin-pin-pad" aria-label="PIN keypad"></div>
+      <form id="admin-pin-form" class="admin-pin-card" tabindex="-1">
+        <h1 id="admin-pin-title" class="picker-kicker">ADMIN ACCESS</h1>
+        <output class="admin-pin-progress" aria-label="PIN digits entered"></output>
+        <div class="admin-pin-pad" aria-label="PIN keypad">
+          <button type="button" data-digit="1">1</button>
+          <button type="button" data-digit="2">2</button>
+          <button type="button" data-digit="3">3</button>
+          <button type="button" data-digit="4">4</button>
+          <button type="button" data-digit="5">5</button>
+          <button type="button" data-digit="6">6</button>
+          <button type="button" data-digit="7">7</button>
+          <button type="button" data-digit="8">8</button>
+          <button type="button" data-digit="9">9</button>
+          <button type="button" data-digit="0">0</button>
+          <button type="button" data-backspace aria-label="Backspace">⌫</button>
+        </div>
         <div id="admin-pin-error" class="admin-pin-error" role="status"></div>
-        <div class="admin-pin-actions"><button id="admin-pin-back" type="button">Back</button></div>
       </form>
     </div>
     <div id="error" class="error"></div>
   </main>
   <script src="/static/appearance.js" defer></script>
+  <script src="/static/pin-keypad.js" defer></script>
   <script src="/static/kiosk.js" defer></script>
 </body>
 </html>
-  <script src="/static/pin-keypad.js" defer></script>
