@@ -24,7 +24,7 @@ from pathlib import Path
 from flask import Flask, jsonify, redirect, render_template, request, send_file, send_from_directory, session
 from PIL import Image, ImageDraw, ImageOps
 
-from selfie_button import SelfieButton
+from bluetooth_remote import BluetoothRemote
 from wifi import Wifi
 
 BASE = Path(__file__).resolve().parent
@@ -137,9 +137,9 @@ class PhotoboothService:
         DATA.mkdir(parents=True, exist_ok=True)
         SESSIONS.mkdir(parents=True, exist_ok=True)
         UPLOAD_QUEUE.mkdir(parents=True, exist_ok=True)
-        self.selfie_button = SelfieButton(
+        self.bluetooth_remote = BluetoothRemote(
             DATA / ".selfie-button", self.stop_event, self.set_selfie_connection,
-            self.capture_from_selfie_button, enabled=not self.demo,
+            self.capture_from_remote, enabled=not self.demo,
         )
         self._init_gpio()
         if not self.demo:
@@ -152,10 +152,9 @@ class PhotoboothService:
             if connected and self.session:
                 self.selfie_seen = True
 
-    def capture_from_selfie_button(self):
+    def capture_from_remote(self, count):
         try:
-            delay = max(0, min(30, int(self.config.get("countdown_seconds", 3))))
-            self.start_capture(1, delay, 0)
+            self.start_configured_capture(count)
         except (RuntimeError, ValueError):
             # A press during another capture or before session selection is ignored.
             pass
@@ -639,7 +638,7 @@ class PhotoboothService:
             )
             photo_wall_version = f"{session['id'] if session else 'none'}:{self.photo_wall_revision}"
             photo_wall_columns = max(1, min(12, int(self.config.get("idle_photo_wall_columns", 3))))
-            selfie_configured = bool(self.selfie_button.address)
+            selfie_configured = bool(self.bluetooth_remote.address)
             selfie_connected = selfie_configured and self.selfie_connected
             return {
                 "session": session,
@@ -853,6 +852,14 @@ class PhotoboothService:
             self.activate_session(dict(self.last_session))
             self.status = f"Session resumed · {self.session['name']}"
             return dict(self.session)
+
+    def start_configured_capture(self, count):
+        if count not in (1, 4):
+            raise ValueError("Capture count must be one or four")
+        delay = max(0, min(30, int(self.config.get("countdown_seconds", 3))))
+        sequence_delay = max(0, min(30, int(self.config.get("sequence_countdown_seconds", 2))))
+        interval = max(0, min(10, float(self.config.get("sequence_interval_seconds", 0.8))))
+        self.start_capture(count, delay, interval, sequence_delay)
 
     def start_capture(self, count, delay, interval, sequence_delay=None):
         with self.state_lock:
@@ -1139,6 +1146,7 @@ def create_app(service, admin_port=ADMIN_PORT):
         regular_admin.update({"admin_selfie_button", "admin_footer_logos", "admin_activate_footer_logo", "admin_remove_footer_logo", "admin_photos_page", "admin_photos", "admin_photo", "admin_delete_photos", "admin_shutdown"})
         regular_admin.update({"admin_wifi_scan", "admin_wifi_connect"})
         local_admin.update({"local_admin_wifi_page", "local_admin_wifi_status", "local_admin_wifi_scan", "local_admin_wifi_connect"})
+        local_admin.add("local_admin_bluetooth_remote")
         if request.endpoint in regular_admin and int(request.environ.get("SERVER_PORT", 0)) != admin_port:
             return jsonify({"error": f"Open the admin interface on port {admin_port}"}), 404
         if request.endpoint in local_admin and not session.get("admin_unlocked"):
@@ -1426,36 +1434,39 @@ def create_app(service, admin_port=ADMIN_PORT):
         except ValueError as exc:
             return jsonify({"error": str(exc)}), 404
 
+    @web.route("/api/local-admin/bluetooth-remote", methods=["GET", "POST"], endpoint="local_admin_bluetooth_remote")
     @web.route("/api/admin/selfie-button", methods=["GET", "POST"])
     def admin_selfie_button():
+        remote = service.bluetooth_remote
         try:
             if request.method == "GET":
-                return jsonify({"devices": service.selfie_button.devices()})
+                result = {}
+                if request.args.get("status_only") != "1":
+                    result["devices"] = remote.devices()
+                with service.state_lock:
+                    result["configured"] = bool(remote.address)
+                    result["connected"] = result["configured"] and service.selfie_connected
+                return jsonify(result)
             payload = request.get_json()
             if isinstance(payload, dict) and payload.get("forget") is True:
-                service.selfie_button.forget()
+                remote.forget()
                 return jsonify({"forgotten": True})
             if isinstance(payload, dict) and payload.get("scan") is True:
-                service.selfie_button.scan()
+                remote.scan()
                 return jsonify({"scanning": True}), 202
-            service.selfie_button.pair(payload.get("address") if isinstance(payload, dict) else None)
+            remote.pair(payload.get("address") if isinstance(payload, dict) else None)
             return jsonify({"paired": True})
         except (ValueError, RuntimeError) as exc:
             return jsonify({"error": str(exc)}), 400
         except OSError:
-            return jsonify({"error": "Could not save the selfie button selection."}), 500
+            return jsonify({"error": "Could not save the Bluetooth remote selection."}), 500
 
     @web.post("/api/admin/capture")
     def admin_capture():
         payload = request.get_json(silent=True) or {}
         try:
             count = int(payload.get("count", 1))
-            if count not in (1, 4):
-                raise ValueError("Capture count must be one or four")
-            delay = max(0, min(30, int(service.config.get("countdown_seconds", 3))))
-            sequence_delay = max(0, min(30, int(service.config.get("sequence_countdown_seconds", 2))))
-            interval = max(0, min(10, float(service.config.get("sequence_interval_seconds", 0.8))))
-            service.start_capture(count, delay, interval, sequence_delay)
+            service.start_configured_capture(count)
             return jsonify({"started": True}), 202
         except (ValueError, RuntimeError) as exc:
             return jsonify({"error": str(exc)}), 400

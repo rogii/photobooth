@@ -7,6 +7,7 @@
   <link rel="stylesheet" href="/static/appearance.css">
   <link rel="stylesheet" href="/static/admin.css">
   <script src="/static/appearance.js" defer></script>
+  <script src="/static/bluetooth-remote.js" defer></script>
   <script src="/static/admin.js" defer></script>
 </head>
 <body>
@@ -46,7 +47,7 @@
       <button type="button" aria-haspopup="dialog" aria-controls="overlay-panel" data-admin-panel="overlay-panel">Session photo overlay</button>
       <button type="button" aria-haspopup="dialog" aria-controls="footer-logos-panel" data-admin-panel="footer-logos-panel">Footer logos</button>
       <button type="button" aria-haspopup="dialog" aria-controls="wifi-panel" data-admin-panel="wifi-panel">Wi-Fi setup</button>
-      <button type="button" aria-haspopup="dialog" aria-controls="selfie-panel" data-admin-panel="selfie-panel">Bluetooth selfie button</button>
+      <button type="button" aria-haspopup="dialog" aria-controls="selfie-panel" data-open-bluetooth-remote>Bluetooth remote</button>
       <button type="button" aria-haspopup="dialog" aria-controls="settings-panel" data-admin-panel="settings-panel">Persistent settings</button>
       <button type="button" aria-haspopup="dialog" aria-controls="system-panel" data-admin-panel="system-panel">System controls</button>
     </nav>
@@ -149,20 +150,20 @@
       </div>
     </dialog>
 
-    <dialog id="selfie-panel" class="admin-panel" aria-labelledby="selfie-panel-heading">
+    <dialog id="selfie-panel" class="admin-panel" aria-labelledby="selfie-panel-heading" data-bluetooth-api="/api/admin/selfie-button">
       <header class="panel-header">
-        <h2 id="selfie-panel-heading">Bluetooth selfie button</h2>
+        <h2 id="selfie-panel-heading">Bluetooth remote</h2>
         <form method="dialog"><button class="secondary" autofocus>Close</button></form>
       </header>
       <div class="panel-content">
-        <p class="muted">Put the button in pairing mode, scan, then select it by name or address.</p>
+        <p class="muted">Put your capture remote in pairing mode, scan, then select it by name or address.</p>
         <form id="selfie-form">
-          <button id="selfie-scan" class="secondary" type="button">Scan for buttons</button>
+          <button id="selfie-scan" class="secondary" type="button">Scan for remotes</button>
           <label>Bluetooth device<select id="selfie-device" required disabled></select></label>
           <button id="selfie-pair" disabled>Pair or reconnect</button>
-          <button id="selfie-forget" class="secondary" type="button" disabled>Forget button</button>
+          <button id="selfie-forget" class="secondary" type="button" disabled>Forget remote</button>
         </form>
-        <p id="selfie-connection" class="muted"></p>
+        <p id="selfie-connection" class="muted" role="status"></p>
         <div id="selfie-message" class="muted" role="status"></div>
       </div>
     </dialog>

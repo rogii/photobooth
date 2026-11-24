@@ -1,4 +1,4 @@
-"""Pair a Bluetooth shutter and listen for its Linux volume key events."""
+"""Pair a Bluetooth capture remote and handle its Linux input events."""
 
 import re
 import shutil
@@ -18,7 +18,7 @@ ADDRESS = r"(?:[0-9A-F]{2}:){5}[0-9A-F]{2}"
 BLUETOOTH_BUS = 0x05
 
 
-class SelfieButton:
+class BluetoothRemote:
     def __init__(self, marker, stop_event, on_connection, on_press, enabled):
         self.marker = marker
         self.stop_event = stop_event
@@ -34,11 +34,11 @@ class SelfieButton:
         if not re.fullmatch(ADDRESS, self.address):
             self.address = ""
         if self.bluetoothctl:
-            threading.Thread(target=self.monitor, daemon=True, name="selfie-button").start()
+            threading.Thread(target=self.monitor, daemon=True, name="bluetooth-remote").start()
 
     def command(self, *args, timeout=5):
         if not self.bluetoothctl:
-            raise RuntimeError("Bluetooth selfie buttons require BlueZ and python3-evdev on the Pi.")
+            raise RuntimeError("Bluetooth capture remotes require BlueZ and python3-evdev on the Pi.")
         try:
             result = subprocess.run(
                 [self.bluetoothctl, "--timeout", str(timeout), *args],
@@ -121,7 +121,13 @@ class SelfieButton:
             self.address = ""
 
     def monitor(self):
-        keys = {evdev.ecodes.KEY_VOLUMEUP, evdev.ecodes.KEY_VOLUMEDOWN}
+        keyboard_keys = {evdev.ecodes.KEY_A, evdev.ecodes.KEY_B}
+        captures = {
+            evdev.ecodes.KEY_A: 1,
+            evdev.ecodes.KEY_B: 4,
+            evdev.ecodes.KEY_VOLUMEUP: 1,
+            evdev.ecodes.KEY_VOLUMEDOWN: 1,
+        }
         devices = {}
         address = ""
         connected = False
@@ -130,12 +136,14 @@ class SelfieButton:
         try:
             while not self.stop_event.is_set():
                 now = time.monotonic()
-                if address != self.address:
+                selected_address = self.address
+                if address != selected_address:
                     for device in devices.values():
                         device.close()
                     devices.clear()
-                    address = self.address
+                    address = selected_address
                     next_search = 0.0
+                    last_press = float("-inf")
 
                 if address and now >= next_search:
                     next_search = now + 1
@@ -147,10 +155,15 @@ class SelfieButton:
                         except OSError:
                             continue
                         try:
-                            if (device.info.bustype == BLUETOOTH_BUS
-                                    and (device.uniq or "").upper() == address
-                                    and keys.intersection(device.capabilities().get(evdev.ecodes.EV_KEY, []))):
-                                devices[path] = device
+                            if device.info.bustype != BLUETOOTH_BUS or (device.uniq or "").upper() != address:
+                                continue
+                            keys = set(device.capabilities().get(evdev.ecodes.EV_KEY, []))
+                            if captures.keys().isdisjoint(keys):
+                                continue
+                            if keyboard_keys.intersection(keys):
+                                # Keep the selected remote's keystrokes out of desktop applications.
+                                device.grab()
+                            devices[path] = device
                         except OSError:
                             pass
                         finally:
@@ -161,11 +174,11 @@ class SelfieButton:
                     try:
                         for event in device.read():
                             # Linux reports releases as 0 and auto-repeat as 2.
-                            if (event.type == evdev.ecodes.EV_KEY and event.code in keys
+                            if (event.type == evdev.ecodes.EV_KEY and event.code in captures
                                     and event.value == 1 and now - last_press >= 0.3
                                     and address == self.address):
                                 last_press = now
-                                self.on_press()
+                                self.on_press(captures[event.code])
                     except BlockingIOError:
                         pass
                     except OSError:

@@ -8,6 +8,8 @@ The system has three deployable components:
 - **Photobooth** (`photobooth/`) is the working camera-connected Raspberry Pi application. It captures photos and collages, stores them locally, and has a persistent upload queue for providing photos to the gallery. Its local kiosk and admin panel continue to work independently. See [`photobooth/README.md`](photobooth/README.md) for setup and operation.
 - **TV Display** (`tv-display/`) is the planned Raspberry Pi Zero client. It will connect to the gallery to show an assigned session slideshow and send TV interactions such as votes. Its local Wi-Fi setup, GPIO controls, and kiosk browser are documented in [`tv-display/README.md`](tv-display/README.md); this component is also still at the design stage.
 
+The [Photobooth Remote](remote/README.md) is a planned battery-powered, two-button Bluetooth keyboard for triggering captures at the booth. Its design covers wiring and the Arduino firmware plan.
+
 ## Information flow
 
 ```mermaid

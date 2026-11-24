@@ -104,6 +104,7 @@ $("#delete-selected").addEventListener("click", async () => {
 });
 
 if ($("#kiosk-link")) {
+  setupBluetoothRemote(api);
   const kioskUrl = new URL(window.location.href);
   kioskUrl.port = "8080";
   kioskUrl.pathname = "/";

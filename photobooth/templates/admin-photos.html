@@ -25,6 +25,7 @@
         {% if local %}
         <a id="kiosk-link" class="button secondary" href="/">Back to kiosk</a>
         <a class="button secondary" href="{{ url_for('local_admin_wifi_page') }}">Wi-Fi setup</a>
+        <button class="button secondary" type="button" aria-haspopup="dialog" aria-controls="selfie-panel" data-open-bluetooth-remote>Bluetooth remote</button>
         <button id="change-pin" class="button secondary" type="button">Change admin PIN</button>
         <button id="exit-kiosk" class="button secondary" type="button">Exit to desktop</button>
         <button id="reboot" class="button danger" type="button">Restart Raspberry Pi</button>
@@ -54,6 +55,22 @@
     <div id="message" role="status" aria-live="polite"></div>
   </main>
   {% if local %}
+  <dialog id="selfie-panel" class="card bluetooth-remote-dialog" aria-labelledby="selfie-panel-heading" data-bluetooth-api="{{ url_for('local_admin_bluetooth_remote') }}">
+    <header class="topbar">
+      <h2 id="selfie-panel-heading">Bluetooth remote</h2>
+      <form method="dialog"><button class="secondary" autofocus>Close</button></form>
+    </header>
+    <p class="muted">Put your capture remote in pairing mode, scan, then select it by name or address.</p>
+    <form id="selfie-form" class="bluetooth-remote-controls">
+      <button id="selfie-scan" class="secondary" type="button">Scan for remotes</button>
+      <label for="selfie-device">Bluetooth device</label>
+      <select id="selfie-device" required disabled></select>
+      <button id="selfie-pair" disabled>Pair or reconnect</button>
+      <button id="selfie-forget" class="secondary" type="button" disabled>Forget remote</button>
+    </form>
+    <p id="selfie-connection" class="muted" role="status"></p>
+    <div id="selfie-message" class="muted" role="status"></div>
+  </dialog>
   <dialog id="change-pin-dialog" class="admin-pin-card" aria-labelledby="change-pin-title">
     <form>
       <h1 id="change-pin-title">Enter new PIN</h1>
@@ -77,6 +94,7 @@
     </form>
   </dialog>
   <script src="/static/pin-keypad.js" defer></script>
+  <script src="/static/bluetooth-remote.js" defer></script>
   {% endif %}
   <script src="/static/appearance.js" defer></script>
   <script src="/static/local-admin.js" defer></script>
