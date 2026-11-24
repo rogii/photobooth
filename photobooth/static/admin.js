@@ -285,5 +285,26 @@ $("#restart").addEventListener("click", async () => {
   }
 });
 
+const shutdownButton = $("#shutdown");
+const shutdownDialog = $("#shutdown-dialog");
+shutdownButton.addEventListener("click", () => {
+  shutdownDialog.returnValue = "";
+  shutdownDialog.showModal();
+});
+shutdownDialog.addEventListener("close", async () => {
+  if (shutdownDialog.returnValue !== "shutdown") return;
+  const status = $("#shutdown-status");
+  shutdownButton.disabled = true;
+  status.hidden = false;
+  status.textContent = "Requesting shutdown…";
+  try {
+    await api("/api/admin/shutdown", {});
+    status.textContent = "Raspberry Pi is shutting down…";
+  } catch (error) {
+    status.textContent = error.message;
+    shutdownButton.disabled = false;
+  }
+});
+
 refresh();
 setInterval(refresh, 2000);

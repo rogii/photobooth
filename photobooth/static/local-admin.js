@@ -18,19 +18,16 @@ function say(message, isError = false) {
   output.classList.toggle("error", isError);
 }
 
-const kioskUrl = new URL(window.location.href);
-kioskUrl.port = "8080";
-kioskUrl.pathname = "/";
-kioskUrl.search = "";
-kioskUrl.hash = "";
-$("#kiosk-link").href = kioskUrl.toString();
+const photoApi = $("[data-photo-api]").dataset.photoApi;
+
+let movingPhotos = false;
 
 async function refreshPhotos() {
   $("#photo-summary").textContent = "Loading photos…";
   try {
     const sessionId = $("#session-filter").value;
     const query = sessionId ? `?session_id=${encodeURIComponent(sessionId)}` : "";
-    const data = await api(`/api/local-admin/photos${query}`);
+    const data = await api(`${photoApi}/photos${query}`);
     const filter = $("#session-filter");
     const selected = filter.value;
     filter.replaceChildren(new Option("All sessions", ""));
@@ -50,7 +47,7 @@ async function refreshPhotos() {
       const card = document.createElement("article");
       card.className = "photo-card";
       const urlPath = photo.relative_path.split("/").map(encodeURIComponent).join("/");
-      const imageUrl = `/api/local-admin/photo/${encodeURIComponent(photo.session_id)}/${urlPath}`;
+      const imageUrl = `${photoApi}/photo/${encodeURIComponent(photo.session_id)}/${urlPath}`;
       const image = document.createElement("img");
       image.src = imageUrl;
       image.alt = `${photo.session_name}: ${photo.name}`;
@@ -82,7 +79,7 @@ async function refreshPhotos() {
 
 function updateDeleteButton() {
   const selected = $("#photo-grid").querySelectorAll("input[type=checkbox]:checked").length;
-  $("#delete-selected").disabled = selected === 0;
+  $("#delete-selected").disabled = movingPhotos || selected === 0;
   $("#delete-selected").textContent = selected ? `Move ${selected} selected to Deleted` : "Move selected to Deleted";
 }
 
@@ -90,78 +87,92 @@ $("#session-filter").addEventListener("change", refreshPhotos);
 $("#refresh").addEventListener("click", refreshPhotos);
 $("#delete-selected").addEventListener("click", async () => {
   const selected = [...$("#photo-grid").querySelectorAll("input[type=checkbox]:checked")];
-  if (!selected.length || !confirm(`Move ${selected.length} selected photo${selected.length === 1 ? "" : "s"} into the Deleted folder? They will disappear from the kiosk Photo Wall and capture count, but remain in session ZIP downloads.`)) return;
+  if (movingPhotos || !selected.length) return;
+  movingPhotos = true;
+  updateDeleteButton();
   try {
     const photos = selected.map((input) => ({ session_id: input.dataset.sessionId, relative_path: input.dataset.relativePath }));
-    const result = await api("/api/local-admin/delete-photos", { photos });
+    const result = await api(`${photoApi}/delete-photos`, { photos });
     say(`Moved ${result.moved} photo${result.moved === 1 ? "" : "s"} into Deleted. They remain in session ZIP downloads.`);
     await refreshPhotos();
   } catch (error) {
     say(error.message, true);
+  } finally {
+    movingPhotos = false;
+    updateDeleteButton();
   }
 });
 
-const pinDialog = $("#change-pin-dialog");
-const pinTitle = $("#change-pin-title");
-const pinInstructions = pinDialog.querySelector("p");
-let newPin = "";
+if ($("#kiosk-link")) {
+  const kioskUrl = new URL(window.location.href);
+  kioskUrl.port = "8080";
+  kioskUrl.pathname = "/";
+  kioskUrl.search = "";
+  kioskUrl.hash = "";
+  $("#kiosk-link").href = kioskUrl.toString();
 
-function startPinChange() {
-  newPin = "";
-  pinTitle.textContent = "Enter new PIN";
-  pinInstructions.textContent = "Choose a four-digit admin PIN.";
-  changePinKeypad.reset(4);
-}
+  const pinDialog = $("#change-pin-dialog");
+  const pinTitle = $("#change-pin-title");
+  const pinInstructions = pinDialog.querySelector("p");
+  let newPin = "";
 
-const changePinKeypad = setupPinKeypad(pinDialog.querySelector("form"), async (pin) => {
-  if (!newPin) {
-    newPin = pin;
-    pinTitle.textContent = "Confirm new PIN";
-    pinInstructions.textContent = "Enter the same PIN again.";
-    return;
+  function startPinChange() {
+    newPin = "";
+    pinTitle.textContent = "Enter new PIN";
+    pinInstructions.textContent = "Choose a four-digit admin PIN.";
+    changePinKeypad.reset(4);
   }
-  if (newPin !== pin) {
+
+  const changePinKeypad = setupPinKeypad(pinDialog.querySelector("form"), async (pin) => {
+    if (!newPin) {
+      newPin = pin;
+      pinTitle.textContent = "Confirm new PIN";
+      pinInstructions.textContent = "Enter the same PIN again.";
+      return;
+    }
+    if (newPin !== pin) {
+      startPinChange();
+      throw new Error("The PINs did not match. Choose a new PIN and try again.");
+    }
+    await api("/api/local-admin/pin", { admin_pin: newPin, confirm_pin: pin });
+    pinDialog.close();
+    say("Admin PIN updated.");
+  });
+
+  $("#change-pin").addEventListener("click", () => {
+    pinDialog.showModal();
     startPinChange();
-    throw new Error("The PINs did not match. Choose a new PIN and try again.");
-  }
-  await api("/api/local-admin/pin", { admin_pin: newPin, confirm_pin: pin });
-  pinDialog.close();
-  say("Admin PIN updated.");
-});
+  });
+  $("#cancel-pin-change").addEventListener("click", () => pinDialog.close());
+  pinDialog.addEventListener("cancel", (event) => {
+    if (changePinKeypad.isPending()) event.preventDefault();
+  });
+  pinDialog.addEventListener("close", () => { newPin = ""; });
 
-$("#change-pin").addEventListener("click", () => {
-  pinDialog.showModal();
-  startPinChange();
-});
-$("#cancel-pin-change").addEventListener("click", () => pinDialog.close());
-pinDialog.addEventListener("cancel", (event) => {
-  if (changePinKeypad.isPending()) event.preventDefault();
-});
-pinDialog.addEventListener("close", () => { newPin = ""; });
+  $("#exit-kiosk").addEventListener("click", async () => {
+    if (!confirm("Close the kiosk browser and return to the desktop?")) return;
+    const button = $("#exit-kiosk");
+    button.disabled = true;
+    try {
+      await api("/api/local-admin/exit-kiosk", {});
+    } catch (error) {
+      say(error.message, true);
+      button.disabled = false;
+    }
+  });
 
-$("#exit-kiosk").addEventListener("click", async () => {
-  if (!confirm("Close the kiosk browser and return to the desktop?")) return;
-  const button = $("#exit-kiosk");
-  button.disabled = true;
-  try {
-    await api("/api/local-admin/exit-kiosk", {});
-  } catch (error) {
-    say(error.message, true);
-    button.disabled = false;
-  }
-});
-
-$("#shutdown").addEventListener("click", async () => {
-  if (!confirm("Shut down the Raspberry Pi now? The photobooth will be unavailable until it is powered on again.")) return;
-  const button = $("#shutdown");
-  button.disabled = true;
-  try {
-    await api("/api/local-admin/shutdown", {});
-    say("Raspberry Pi is shutting down…");
-  } catch (error) {
-    say(error.message, true);
-    button.disabled = false;
-  }
-});
+  $("#shutdown").addEventListener("click", async () => {
+    if (!confirm("Shut down the Raspberry Pi now? The photobooth will be unavailable until it is powered on again.")) return;
+    const button = $("#shutdown");
+    button.disabled = true;
+    try {
+      await api("/api/local-admin/shutdown", {});
+      say("Raspberry Pi is shutting down…");
+    } catch (error) {
+      say(error.message, true);
+      button.disabled = false;
+    }
+  });
+}
 
 refreshPhotos();
