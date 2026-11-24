@@ -11,6 +11,8 @@ USER_HOME="$HOME"
 
 sudo apt update
 sudo apt install -y python3 python3-venv python3-lgpio python3-gpiozero gphoto2 chromium
+# The kiosk launcher manages unclutter instead of using Debian's session-wide autostart.
+sudo apt install -y --no-install-recommends unclutter-xfixes
 
 if ! getent group gpio >/dev/null; then
   sudo groupadd --system gpio
