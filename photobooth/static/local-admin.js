@@ -101,15 +101,53 @@ $("#delete-selected").addEventListener("click", async () => {
   }
 });
 
-$("#pin-form").addEventListener("submit", async (event) => {
-  event.preventDefault();
-  const input = $("#new-pin");
+const pinDialog = $("#change-pin-dialog");
+const pinTitle = $("#change-pin-title");
+const pinInstructions = pinDialog.querySelector("p");
+let newPin = "";
+
+function startPinChange() {
+  newPin = "";
+  pinTitle.textContent = "Enter new PIN";
+  pinInstructions.textContent = "Choose a four-digit admin PIN.";
+  changePinKeypad.reset(4);
+}
+
+const changePinKeypad = setupPinKeypad(pinDialog.querySelector("form"), async (pin) => {
+  if (!newPin) {
+    newPin = pin;
+    pinTitle.textContent = "Confirm new PIN";
+    pinInstructions.textContent = "Enter the same PIN again.";
+    return;
+  }
+  if (newPin !== pin) {
+    startPinChange();
+    throw new Error("The PINs did not match. Choose a new PIN and try again.");
+  }
+  await api("/api/local-admin/pin", { admin_pin: newPin, confirm_pin: pin });
+  pinDialog.close();
+  say("Admin PIN updated.");
+});
+
+$("#change-pin").addEventListener("click", () => {
+  pinDialog.showModal();
+  startPinChange();
+});
+$("#cancel-pin-change").addEventListener("click", () => pinDialog.close());
+pinDialog.addEventListener("cancel", (event) => {
+  if (changePinKeypad.isPending()) event.preventDefault();
+});
+pinDialog.addEventListener("close", () => { newPin = ""; });
+
+$("#exit-kiosk").addEventListener("click", async () => {
+  if (!confirm("Close the kiosk browser and return to the desktop?")) return;
+  const button = $("#exit-kiosk");
+  button.disabled = true;
   try {
-    await api("/api/local-admin/pin", { admin_pin: input.value });
-    input.value = "";
-    say("Admin PIN updated.");
+    await api("/api/local-admin/exit-kiosk", {});
   } catch (error) {
     say(error.message, true);
+    button.disabled = false;
   }
 });
 

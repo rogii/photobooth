@@ -16,9 +16,7 @@ function showAdminPin() {
   adminHoldTimer = null;
   $("#admin-access").classList.remove("holding");
   $("#admin-pin-dialog").classList.remove("hidden");
-  $("#admin-pin-input").value = "";
-  $("#admin-pin-error").textContent = "";
-  $("#admin-pin-input").focus();
+  adminPinKeypad.reset(state?.admin_pin_length ?? 4);
 }
 
 function openAdminPanel() {
@@ -308,26 +306,13 @@ adminAccess.addEventListener("keydown", (event) => {
 ["keyup", "blur"].forEach((name) => adminAccess.addEventListener(name, cancelAdminHold));
 
 $("#admin-pin-back").addEventListener("click", () => $("#admin-pin-dialog").classList.add("hidden"));
-$(".admin-pin-pad").addEventListener("click", (event) => {
-  const button = event.target.closest("button");
-  if (!button) return;
-  const input = $("#admin-pin-input");
-  if (button.dataset.pinDigit !== undefined) input.value += button.dataset.pinDigit;
-  if (button.dataset.pinAction === "clear") input.value = "";
-  if (button.dataset.pinAction === "delete") input.value = input.value.slice(0, -1);
-});
-$("#admin-pin-form").addEventListener("submit", async (event) => {
-  event.preventDefault();
-  const submit = $("#admin-pin-form button[type='submit']");
-  submit.disabled = true;
-  $("#admin-pin-error").textContent = "";
+const adminPinKeypad = setupPinKeypad($("#admin-pin-form"), async (pin) => {
   try {
-    await api("/api/admin/unlock", { pin: $("#admin-pin-input").value });
+    await api("/api/admin/unlock", { pin });
     openAdminPanel();
   } catch (error) {
-    $("#admin-pin-error").textContent = error.message === "Invalid PIN" ? "Incorrect PIN. Try again." : error.message;
-    $("#admin-pin-input").select();
-  } finally {
-    submit.disabled = false;
+    adminPinKeypad.reset(state?.admin_pin_length ?? 4);
+    if (error.message === "Invalid PIN") throw new Error("Incorrect PIN. Try again.");
+    throw error;
   }
 });

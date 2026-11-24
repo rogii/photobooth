@@ -6,6 +6,7 @@
   <meta name="theme-color" content="#10191a">
   <title>Photobooth Local Admin</title>
   <link rel="stylesheet" href="/static/local-admin.css">
+  <link rel="stylesheet" href="/static/pin-dialog.css">
 </head>
 <body>
   <main class="wrap">
@@ -17,20 +18,11 @@
       </div>
       <div class="top-actions">
         <a id="kiosk-link" class="button secondary" href="/">Back to kiosk</a>
+        <button id="change-pin" class="button secondary" type="button">Change admin PIN</button>
+        <button id="exit-kiosk" class="button secondary" type="button">Exit to desktop</button>
         <button id="shutdown" class="button danger" type="button">Shut down Raspberry Pi</button>
       </div>
     </header>
-
-    <section class="card pin-card">
-      <div>
-        <h2>Admin PIN</h2>
-        <p class="muted">The initial PIN is 1234. Enter a new 4 to 12 digit PIN to change it.</p>
-      </div>
-      <form id="pin-form">
-        <input id="new-pin" type="password" inputmode="numeric" minlength="4" maxlength="12" autocomplete="new-password" placeholder="New PIN" aria-label="New admin PIN">
-        <button type="submit">Save PIN</button>
-      </form>
-    </section>
 
     <section class="card">
       <div class="photo-heading">
@@ -50,6 +42,17 @@
 
     <div id="message" role="status" aria-live="polite"></div>
   </main>
+  <dialog id="change-pin-dialog" class="admin-pin-card" aria-labelledby="change-pin-title">
+    <form>
+      <h1 id="change-pin-title">Enter new PIN</h1>
+      <p>Choose a four-digit admin PIN.</p>
+      <input id="new-pin" type="password" inputmode="numeric" autocomplete="new-password" aria-labelledby="change-pin-title">
+      <div class="admin-pin-pad" aria-label="PIN keypad"></div>
+      <div class="admin-pin-error" role="status"></div>
+      <div class="admin-pin-actions"><button id="cancel-pin-change" type="button">Cancel</button></div>
+    </form>
+  </dialog>
+  <script src="/static/pin-keypad.js" defer></script>
   <script src="/static/local-admin.js" defer></script>
 </body>
 </html>

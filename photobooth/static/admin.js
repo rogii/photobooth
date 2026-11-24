@@ -117,8 +117,10 @@ $("#settings-form").addEventListener("submit", async (event) => {
   event.preventDefault();
   const settings = Object.fromEntries(new FormData(event.currentTarget));
   if (!settings.upload_token) delete settings.upload_token;
+  if (!settings.admin_pin) delete settings.admin_pin;
   try {
     await api("/api/config", settings);
+    event.target.elements.admin_pin.value = "";
     say("Settings saved to config.json");
     refresh();
   } catch (error) {

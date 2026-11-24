@@ -6,6 +6,7 @@
   <meta name="theme-color" content="#080b0d">
   <title>Photobooth</title>
   <link rel="stylesheet" href="/static/kiosk.css">
+  <link rel="stylesheet" href="/static/pin-dialog.css">
 </head>
 <body>
   <main id="screen" class="idle">
@@ -73,14 +74,9 @@
         <h1 id="admin-pin-title">Enter PIN</h1>
         <p>Enter the admin PIN to continue.</p>
         <input id="admin-pin-input" type="password" inputmode="numeric" maxlength="12" autocomplete="current-password" aria-label="Admin PIN">
-        <div class="admin-pin-pad" aria-label="PIN keypad">
-          <button type="button" data-pin-digit="1">1</button><button type="button" data-pin-digit="2">2</button><button type="button" data-pin-digit="3">3</button>
-          <button type="button" data-pin-digit="4">4</button><button type="button" data-pin-digit="5">5</button><button type="button" data-pin-digit="6">6</button>
-          <button type="button" data-pin-digit="7">7</button><button type="button" data-pin-digit="8">8</button><button type="button" data-pin-digit="9">9</button>
-          <button type="button" data-pin-action="clear">Clear</button><button type="button" data-pin-digit="0">0</button><button type="button" data-pin-action="delete">⌫</button>
-        </div>
-        <div id="admin-pin-error" role="status"></div>
-        <div class="admin-pin-actions"><button id="admin-pin-back" type="button">Back</button><button type="submit">Continue</button></div>
+        <div class="admin-pin-pad" aria-label="PIN keypad"></div>
+        <div id="admin-pin-error" class="admin-pin-error" role="status"></div>
+        <div class="admin-pin-actions"><button id="admin-pin-back" type="button">Back</button></div>
       </form>
     </div>
     <div id="error" class="error"></div>
@@ -88,3 +84,4 @@
   <script src="/static/kiosk.js" defer></script>
 </body>
 </html>
+  <script src="/static/pin-keypad.js" defer></script>
