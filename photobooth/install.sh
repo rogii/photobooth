@@ -230,5 +230,5 @@ if [[ "$GPIO_RELOGIN_REQUIRED" == true ]]; then
   echo "GPIO access is configured for $USER_NAME. Reboot the Pi so the user service receives the new gpio group membership."
 fi
 if [[ "$BLUETOOTH_RELOGIN_REQUIRED" == true ]]; then
-  echo "Bluetooth input access is configured for $USER_NAME. Reboot the Pi before pairing a selfie button."
+  echo "Bluetooth input access is configured for $USER_NAME. Reboot the Pi before pairing a capture remote."
 fi
