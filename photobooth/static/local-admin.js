@@ -161,18 +161,23 @@ if ($("#kiosk-link")) {
     }
   });
 
-  $("#shutdown").addEventListener("click", async () => {
-    if (!confirm("Shut down the Raspberry Pi now? The photobooth will be unavailable until it is powered on again.")) return;
-    const button = $("#shutdown");
-    button.disabled = true;
-    try {
-      await api("/api/local-admin/shutdown", {});
-      say("Raspberry Pi is shutting down…");
-    } catch (error) {
-      say(error.message, true);
-      button.disabled = false;
-    }
-  });
+  const powerActions = [
+    ["reboot", "Restart the Raspberry Pi now? The photobooth will be unavailable while it restarts.", "Raspberry Pi is restarting…"],
+    ["shutdown", "Shut down the Raspberry Pi now? The photobooth will be unavailable until it is powered on again.", "Raspberry Pi is shutting down…"],
+  ];
+  for (const [action, prompt, message] of powerActions) {
+    $(`#${action}`).addEventListener("click", async () => {
+      if (!confirm(prompt)) return;
+      for (const [id] of powerActions) $(`#${id}`).disabled = true;
+      try {
+        await api(`/api/local-admin/${action}`, {});
+        say(message);
+      } catch (error) {
+        say(error.message, true);
+        for (const [id] of powerActions) $(`#${id}`).disabled = false;
+      }
+    });
+  }
 }
 
 refreshPhotos();
