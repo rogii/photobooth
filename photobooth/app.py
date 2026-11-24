@@ -275,9 +275,9 @@ class PhotoboothService:
         overlay_path = self.session_overlay_path(session)
         if not overlay_path or not overlay_path.is_file():
             return photo
-        output_dir = photo.parent / "overlays"
+        output_dir = photo.parent / "overlay"
         output_dir.mkdir(parents=True, exist_ok=True)
-        output = output_dir / photo.name
+        output = output_dir / f"{photo.stem}_overlay.jpg"
         with Image.open(photo) as source, Image.open(overlay_path) as overlay_source:
             base = ImageOps.exif_transpose(source).convert("RGBA")
             overlay = ImageOps.exif_transpose(overlay_source).convert("RGBA")
@@ -285,7 +285,6 @@ class PhotoboothService:
                 overlay = ImageOps.fit(overlay, base.size, method=Image.Resampling.LANCZOS)
             base.alpha_composite(overlay)
             base.convert("RGB").save(output, format="JPEG", quality=92, optimize=True)
-        output.with_suffix(output.suffix + ".overlay.json").write_text(json.dumps({"overlay": overlay_path.name}))
         return output
 
     def session_photo_dir(self, session):
@@ -500,9 +499,14 @@ class PhotoboothService:
         files = files[:columns * max(1, min(12, int(rows)))]
         result = []
         for path in files:
-            composite = path.parent / "overlays" / path.name
-            marker = composite.with_suffix(composite.suffix + ".overlay.json")
-            display = composite if composite.is_file() and marker.is_file() else path
+            composite = path.parent / "overlay" / f"{path.stem}_overlay.jpg"
+            legacy_composite = path.parent / "overlays" / path.name
+            legacy_marker = legacy_composite.with_suffix(legacy_composite.suffix + ".overlay.json")
+            if not composite.is_file() and legacy_composite.is_file() and legacy_marker.is_file():
+                composite.parent.mkdir(parents=True, exist_ok=True)
+                legacy_composite.replace(composite)
+                legacy_marker.unlink(missing_ok=True)
+            display = composite if composite.is_file() else path
             relative = display.relative_to(folder).as_posix()
             result.append({"name": path.name, "url": f"/api/photos/{folder.name}/{relative}"})
         return result
@@ -688,7 +692,7 @@ class PhotoboothService:
                             if self.flash:
                                 self.flash.on()
                                 time.sleep(float(self.config.get("flash_seconds", 0.18)))
-                            capture_result["photo"] = self.capture_one(photo_wall_visible=(count == 1))
+                            capture_result["photo"] = self.capture_one()
                         except Exception as exc:
                             capture_result["error"] = exc
                         finally:
@@ -736,6 +740,7 @@ class PhotoboothService:
                     raise capture_result["error"]
                 photo = capture_result["photo"]
                 files.append(photo)
+                self.make_overlaid_photo(photo, self.session)
                 if index + 1 < count:
                     time.sleep(interval)
             result = self.make_result(files)
@@ -786,11 +791,9 @@ class PhotoboothService:
                     self.photo_number = 0
                     self.photo_total = 0
 
-    def capture_one(self, photo_wall_visible=True):
+    def capture_one(self):
         session = self.session
         folder = self.session_photo_dir(session)
-        if not photo_wall_visible:
-            folder = folder / "singles"
         folder.mkdir(parents=True, exist_ok=True)
         path = folder / f"{datetime.now().strftime('%Y%m%d-%H%M%S-%f')}.jpg"
         if self.demo:
