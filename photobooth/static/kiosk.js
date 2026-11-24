@@ -1,4 +1,8 @@
 const $ = (selector) => document.querySelector(selector);
+if (new URLSearchParams(location.search).get("hide_cursor") === "1") {
+  document.documentElement.classList.add("hide-cursor");
+}
+
 let state = null;
 let connected = false;
 let serverInstanceId = null;

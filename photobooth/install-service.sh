@@ -7,6 +7,9 @@ USER_ID="$(id -u)"
 export XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR:-/run/user/$USER_ID}"
 export DBUS_SESSION_BUS_ADDRESS="${DBUS_SESSION_BUS_ADDRESS:-unix:path=$XDG_RUNTIME_DIR/bus}"
 
+# Prevent the desktop from claiming the camera through D-Bus activation.
+systemctl --user mask --now gvfs-gphoto2-volume-monitor.service
+
 SERVICE_DIR="$USER_HOME/.config/systemd/user"
 AUTOSTART_DIR="$USER_HOME/.config/autostart"
 mkdir -p "$SERVICE_DIR" "$AUTOSTART_DIR"

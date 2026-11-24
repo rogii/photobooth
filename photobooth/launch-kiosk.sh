@@ -32,9 +32,26 @@ exec 9>"$KIOSK_RUNTIME_DIR/launcher.lock"
 flock -n 9 || exit 0
 
 PROFILE_DIR="$HOME/.config/photobooth-kiosk-chromium"
-"$BROWSER" --kiosk --user-data-dir="$PROFILE_DIR" --no-first-run --noerrdialogs --disable-infobars --disable-session-crashed-bubble --password-store=basic http://127.0.0.1:8080 9>&- &
+KIOSK_URL="http://127.0.0.1:8080"
+UNCLUTTER_PID=""
+if [[ "${XDG_SESSION_TYPE:-}" == wayland || -n "${WAYLAND_DISPLAY:-}" ]]; then
+  KIOSK_URL="$KIOSK_URL/?hide_cursor=1"
+elif [[ -n "${DISPLAY:-}" ]] && command -v unclutter >/dev/null; then
+  unclutter --start-hidden --timeout 1 --hide-on-touch 9>&- &
+  UNCLUTTER_PID=$!
+fi
+
+cleanup() {
+  if [[ -n "$UNCLUTTER_PID" ]]; then
+    kill "$UNCLUTTER_PID" 2>/dev/null || true
+    wait "$UNCLUTTER_PID" 2>/dev/null || true
+  fi
+  rm -f "$KIOSK_RUNTIME_DIR/browser.pid"
+}
+trap cleanup EXIT
+
+"$BROWSER" --kiosk --user-data-dir="$PROFILE_DIR" --no-first-run --noerrdialogs --disable-infobars --disable-session-crashed-bubble --password-store=basic "$KIOSK_URL" 9>&- &
 BROWSER_PID=$!
-trap 'rm -f "$KIOSK_RUNTIME_DIR/browser.pid"' EXIT
 trap 'kill -TERM "$BROWSER_PID" 2>/dev/null || true' TERM INT
 printf '%s\n' "$BROWSER_PID" > "$KIOSK_RUNTIME_DIR/browser.pid"
 
