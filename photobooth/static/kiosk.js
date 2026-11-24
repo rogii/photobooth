@@ -58,7 +58,7 @@ function render(current) {
   $("#camera-error").classList.toggle("hidden", !cameraFailed);
   $("#camera-error-detail").textContent = current.camera_error || "The camera is not responding.";
   $("#event").textContent = current.session?.name || "";
-  $("#event-footer").classList.toggle("hidden", !current.session || current.phase === "result");
+  $("#event-footer").classList.toggle("hidden", !current.session || current.phase !== "idle");
   $("#capture-count").textContent = Number(current.capture_count || 0).toLocaleString();
   const queuedUploads = Number(current.queued_uploads || 0);
   const galleryUploadConfigured = !!current.gallery_upload_configured;
@@ -83,6 +83,8 @@ function render(current) {
     ? `PHOTO ${current.photo_number} / ${current.photo_total}`
     : "";
   const showingCapture = current.phase === "capturing";
+  const showingFinalCapture = showingCapture && current.photo_total === 4 && current.photo_number === 4;
+  $("#sequence-processing").classList.toggle("hidden", !showingFinalCapture);
   $("#countdown").classList.toggle("hidden", !(current.phase === "countdown" || showingCapture) || !current.countdown);
   $("#countdown").textContent = current.phase === "countdown" || showingCapture ? current.countdown : "";
   $("#capture-detail").classList.toggle("hidden", !showingCapture);

@@ -14,7 +14,13 @@
     <section id="overlay" class="overlay hidden">
       <div id="photo-position" class="photo-position hidden"></div>
       <div id="countdown" class="countdown"></div>
-      <p id="capture-detail" class="capture-detail hidden"></p>
+      <div class="capture-messages">
+        <p id="capture-detail" class="capture-detail hidden"></p>
+        <p id="sequence-processing" class="sequence-processing hidden" role="status">
+          <span class="spinner" aria-hidden="true"></span>
+          <span>Combining all four photos into one image may take a moment.</span>
+        </p>
+      </div>
       <img id="result" class="result hidden" alt="Your photo">
     </section>
     <div id="empty" class="empty hidden">
