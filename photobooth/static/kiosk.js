@@ -58,7 +58,7 @@ function render(current) {
   $("#camera-error").classList.toggle("hidden", !cameraFailed);
   $("#camera-error-detail").textContent = current.camera_error || "The camera is not responding.";
   $("#event").textContent = current.session?.name || "";
-  $("#event-footer").classList.toggle("hidden", !current.session || current.phase === "result");
+  $("#event-footer").classList.toggle("hidden", !current.session || current.phase !== "idle");
   $("#capture-count").textContent = Number(current.capture_count || 0).toLocaleString();
   const queuedUploads = Number(current.queued_uploads || 0);
   const galleryUploadConfigured = !!current.gallery_upload_configured;
