@@ -325,7 +325,7 @@ window.addEventListener("resize", () => {
 });
 
 const adminPinDialog = $("#admin-pin-dialog");
-for (const trigger of [$("#admin-access"), $("#camera-admin-access")]) {
+for (const trigger of [$("#admin-access"), $("#camera-admin-access"), $("#selfie-admin-access")]) {
   trigger.addEventListener("pointerdown", (event) => {
     if (!event.isPrimary || (event.pointerType === "mouse" && event.button !== 0)) return;
     event.preventDefault();
