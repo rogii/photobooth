@@ -113,7 +113,7 @@ The hotspot credentials are shared across installations. Use a distinct admin PI
 2. On the booth screen, unlock local admin with the admin PIN. Put the remote in pairing mode, then use **Bluetooth remote → Scan for remotes**. The same controls are available on the network admin page on port 8081.
 3. Choose the remote by name or Bluetooth address and select **Pair or reconnect**. Wait for **Bluetooth remote connected**, then test it with a photo session active.
 
-A selfie shutter that sends volume-up or volume-down triggers a single photo. A dedicated HID keyboard remote such as the [planned nRF52840 remote](../remote/README.md) can send `A` for one photo or `B` for a four-shot sequence. Photobooth handles these events in the backend, so capture works regardless of browser focus. It takes exclusive access to the selected remote's keyboard input to keep its keystrokes out of desktop applications. Pair a regular typing keyboard through Raspberry Pi OS instead.
+A selfie shutter that sends volume-up or volume-down triggers a single photo. A dedicated HID keyboard remote such as the [nRF52840 remote](../remote/README.md) can send `A` for one photo or `B` for a four-shot sequence. Photobooth handles these events in the backend, so capture works regardless of browser focus. It takes exclusive access to the selected remote's keyboard input to keep its keystrokes out of desktop applications. Pair a regular typing keyboard through Raspberry Pi OS instead.
 
 On Raspberry Pi OS desktops using `wf-panel-pi`, the installer removes the Bluetooth widget from the kiosk user's panel so it cannot open a connection dialog over the kiosk. Pairing is available in Photobooth Admin. Restart the desktop session if it was already running during installation.
 
