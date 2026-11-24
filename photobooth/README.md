@@ -99,4 +99,6 @@ Either volume key starts one photo with the configured single-photo countdown. H
 
 The Photo Wall footer shows **Connected** or **Disconnected** after the remote has connected during the active photo session. The indicator stays hidden until that first connection.
 
+When a saved remote is disconnected, the idle kiosk prompts guests to press the button once to wake it. The prompt clears when the remote reconnects, and the next press takes a photo.
+
 Select **Forget button** in the admin panel to remove the pairing from the Pi and clear Photobooth's saved selection. Scan and pair again to use the remote.
