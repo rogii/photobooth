@@ -83,6 +83,8 @@ function render(current) {
     ? `PHOTO ${current.photo_number} / ${current.photo_total}`
     : "";
   const showingCapture = current.phase === "capturing";
+  const showingFinalCapture = showingCapture && current.photo_total === 4 && current.photo_number === 4;
+  $("#sequence-processing").classList.toggle("hidden", !showingFinalCapture);
   $("#countdown").classList.toggle("hidden", !(current.phase === "countdown" || showingCapture) || !current.countdown);
   $("#countdown").textContent = current.phase === "countdown" || showingCapture ? current.countdown : "";
   $("#capture-detail").classList.toggle("hidden", !showingCapture);
