@@ -8,6 +8,7 @@ import hmac
 import json
 import os
 import shutil
+import signal
 import subprocess
 import tempfile
 import threading
@@ -33,6 +34,34 @@ NEXT_DISPLAY_FILE = DATA / "latest-display-next.jpg"
 LOCKED_SESSION = DATA / "locked-session.json"
 ADMIN_PORT = 8081
 SERVER_INSTANCE_ID = uuid.uuid4().hex
+
+
+def exit_kiosk_browser():
+    if not hasattr(os, "pidfd_open"):
+        raise RuntimeError("The kiosk browser launcher is only available on Linux.")
+    runtime = Path(os.environ.get("XDG_RUNTIME_DIR", f"/run/user/{os.getuid()}"))
+    profile = Path.home() / ".config" / "photobooth-kiosk-chromium"
+    try:
+        pid = int((runtime / "photobooth-kiosk" / "browser.pid").read_text())
+        if pid <= 1:
+            raise ValueError("Invalid browser PID")
+        fd = os.pidfd_open(pid)
+        try:
+            process = Path(f"/proc/{pid}")
+            args = (process / "cmdline").read_bytes().rstrip(b"\0").split(b"\0")
+            profile_arg = os.fsencode(f"--user-data-dir={profile}")
+            kiosk_args = b"--kiosk" in args and profile_arg in args
+            if len(args) == 1 and (process / "exe").resolve().name in {"chromium", "chromium-browser"}:
+                # Chromium can rewrite argv as a single process title.
+                title = b" " + args[0] + b" "
+                kiosk_args = b" --kiosk " in title and b" " + profile_arg + b" " in title
+            if not kiosk_args:
+                raise ValueError("Kiosk browser arguments did not match")
+            signal.pidfd_send_signal(fd, signal.SIGTERM)
+        finally:
+            os.close(fd)
+    except (OSError, ValueError) as exc:
+        raise RuntimeError("No kiosk browser can be closed. Start it with launch-kiosk.sh.") from exc
 
 
 def read_config():
@@ -560,8 +589,8 @@ class PhotoboothService:
         admin_pin = None
         if "admin_pin" in values:
             admin_pin = str(values["admin_pin"]).strip()
-            if not admin_pin.isdigit() or not 4 <= len(admin_pin) <= 12:
-                raise ValueError("Admin PIN must contain 4 to 12 digits")
+            if len(admin_pin) != 4 or not admin_pin.isascii() or not admin_pin.isdigit():
+                raise ValueError("Admin PIN must contain exactly four digits")
         previous_gpio_pin = self.config.get("gpio_flash_pin", 17)
         allowed = {"countdown_seconds": (0, 30, int), "sequence_countdown_seconds": (0, 30, int), "capture_lead_seconds": (0, 5, float), "sequence_interval_seconds": (0, 10, float), "idle_photo_wall_columns": (1, 12, int), "result_timeout_seconds": (1, 300, int), "gpio_flash_pin": (0, 27, int), "flash_seconds": (0, 5, float)}
         for key, (low, high, cast) in allowed.items():
@@ -960,7 +989,7 @@ def create_app(service, admin_port=ADMIN_PORT):
     @web.before_request
     def admin_routes():
         regular_admin = {"admin", "save_config", "admin_event", "admin_session_lock", "admin_session_stop", "admin_session_hidden", "admin_session_delete", "admin_session_download", "admin_session_overlay", "admin_session_overlay_pause", "admin_capture", "restart_app", "get_admin_state"}
-        local_admin = {"local_admin_page", "local_admin_photos", "local_admin_photo", "local_admin_delete_photos", "local_admin_shutdown", "local_admin_change_pin"}
+        local_admin = {"local_admin_page", "local_admin_photos", "local_admin_photo", "local_admin_delete_photos", "local_admin_shutdown", "local_admin_change_pin", "local_admin_exit_kiosk"}
         if request.endpoint in regular_admin and int(request.environ.get("SERVER_PORT", 0)) != admin_port:
             return jsonify({"error": f"Open the admin interface on port {admin_port}"}), 404
         if request.endpoint in local_admin and not session.get("admin_unlocked"):
@@ -974,7 +1003,7 @@ def create_app(service, admin_port=ADMIN_PORT):
         payload = request.get_json(silent=True) or {}
         expected = str(service.config.get("admin_pin", "1234"))
         provided = str(payload.get("pin", ""))
-        if not hmac.compare_digest(provided, expected):
+        if not hmac.compare_digest(provided.encode(), expected.encode()):
             return jsonify({"error": "Invalid PIN"}), 401
         session["admin_unlocked"] = True
         return jsonify({"unlocked": True})
@@ -1044,11 +1073,26 @@ def create_app(service, admin_port=ADMIN_PORT):
     @web.post("/api/local-admin/pin")
     def local_admin_change_pin():
         payload = request.get_json(silent=True) or {}
+        pin = payload.get("admin_pin", "")
+        if pin != payload.get("confirm_pin"):
+            return jsonify({"error": "The PINs did not match"}), 400
         try:
-            service.update_config({"admin_pin": payload.get("admin_pin", "")})
+            service.update_config({"admin_pin": pin})
             return jsonify({"saved": True})
         except (ValueError, TypeError, RuntimeError) as exc:
             return jsonify({"error": str(exc)}), 400
+
+    @web.post("/api/local-admin/exit-kiosk")
+    def local_admin_exit_kiosk():
+        if request.remote_addr not in {"127.0.0.1", "::1"}:
+            return jsonify({"error": "Exit to desktop is only available on the kiosk."}), 403
+        if not request.is_json:
+            return jsonify({"error": "Expected a JSON request"}), 415
+        try:
+            exit_kiosk_browser()
+        except RuntimeError as exc:
+            return jsonify({"error": str(exc)}), 409
+        return jsonify({"exiting": True})
 
     @web.post("/api/admin/event")
     def admin_event():
@@ -1159,6 +1203,7 @@ def create_app(service, admin_port=ADMIN_PORT):
         state = service.state()
         public = {key: state[key] for key in ("session", "busy", "status", "countdown", "photo_number", "photo_total", "recent_photo", "recent_photo_version", "phase", "photo_wall_version", "photo_wall_columns", "capture_count", "queued_uploads", "gallery_upload_configured", "sessions", "locked_session", "host_info", "camera_available", "camera_error")}
         public["server_instance_id"] = SERVER_INSTANCE_ID
+        public["admin_pin_length"] = len(str(service.config.get("admin_pin", "1234")))
         public["keys"] = {"single": service.config.get("key_single", "a"), "sequence": service.config.get("key_sequence", "b")}
         return jsonify(public)
 

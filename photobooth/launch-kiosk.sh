@@ -26,4 +26,20 @@ if [[ "$READY" != 1 ]]; then
   exit 1
 fi
 
-"$BROWSER" --kiosk --no-first-run --noerrdialogs --disable-infobars --disable-session-crashed-bubble --password-store=basic http://127.0.0.1:8080
+KIOSK_RUNTIME_DIR="$XDG_RUNTIME_DIR/photobooth-kiosk"
+mkdir -p -m 700 "$KIOSK_RUNTIME_DIR"
+exec 9>"$KIOSK_RUNTIME_DIR/launcher.lock"
+flock -n 9 || exit 0
+
+PROFILE_DIR="$HOME/.config/photobooth-kiosk-chromium"
+"$BROWSER" --kiosk --user-data-dir="$PROFILE_DIR" --no-first-run --noerrdialogs --disable-infobars --disable-session-crashed-bubble --password-store=basic http://127.0.0.1:8080 9>&- &
+BROWSER_PID=$!
+trap 'rm -f "$KIOSK_RUNTIME_DIR/browser.pid"' EXIT
+trap 'kill -TERM "$BROWSER_PID" 2>/dev/null || true' TERM INT
+printf '%s\n' "$BROWSER_PID" > "$KIOSK_RUNTIME_DIR/browser.pid"
+
+BROWSER_STATUS=0
+wait "$BROWSER_PID" || BROWSER_STATUS=$?
+if [[ "$BROWSER_STATUS" != 143 ]]; then
+  exit "$BROWSER_STATUS"
+fi
