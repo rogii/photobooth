@@ -21,7 +21,7 @@ import zipfile
 from datetime import datetime
 from pathlib import Path
 
-from flask import Flask, jsonify, redirect, request, send_file, send_from_directory, session
+from flask import Flask, jsonify, redirect, render_template, request, send_file, send_from_directory, session
 from PIL import Image, ImageDraw, ImageOps
 
 BASE = Path(__file__).resolve().parent
@@ -1086,7 +1086,7 @@ def create_app(service, admin_port=ADMIN_PORT):
     def admin_routes():
         regular_admin = {"admin", "save_config", "admin_event", "admin_session_lock", "admin_session_stop", "admin_session_hidden", "admin_session_delete", "admin_session_download", "admin_session_overlay", "admin_session_overlay_pause", "admin_capture", "restart_app", "get_admin_state"}
         local_admin = {"local_admin_page", "local_admin_photos", "local_admin_photo", "local_admin_delete_photos", "local_admin_shutdown", "local_admin_change_pin", "local_admin_exit_kiosk"}
-        regular_admin.update({"admin_footer_logos", "admin_activate_footer_logo", "admin_remove_footer_logo"})
+        regular_admin.update({"admin_footer_logos", "admin_activate_footer_logo", "admin_remove_footer_logo", "admin_photos_page", "admin_photos", "admin_photo", "admin_delete_photos", "admin_shutdown"})
         if request.endpoint in regular_admin and int(request.environ.get("SERVER_PORT", 0)) != admin_port:
             return jsonify({"error": f"Open the admin interface on port {admin_port}"}), 404
         if request.endpoint in local_admin and not session.get("admin_unlocked"):
@@ -1117,7 +1117,11 @@ def create_app(service, admin_port=ADMIN_PORT):
 
     @web.get("/local-admin")
     def local_admin_page():
-        return send_from_directory(BASE / "static", "local-admin.html")
+        return render_template("admin-photos.html", local=True)
+
+    @web.get("/admin/captures")
+    def admin_photos_page():
+        return render_template("admin-photos.html", local=False)
 
     @web.get("/api/appearance")
     def get_appearance():
@@ -1136,11 +1140,13 @@ def create_app(service, admin_port=ADMIN_PORT):
         result["config"] = {key: service.config.get(key, "") for key in ("countdown_seconds", "sequence_countdown_seconds", "capture_lead_seconds", "sequence_interval_seconds", "idle_photo_wall_columns", "result_timeout_seconds", "camera_command", "upload_url", "gpio_flash_pin", "flash_seconds", "key_single", "key_sequence")}
         return jsonify(result)
 
+    @web.get("/api/admin/photos", endpoint="admin_photos")
     @web.get("/api/local-admin/photos")
     def local_admin_photos():
         sessions, photos = service.local_admin_photos(request.args.get("session_id"))
         return jsonify({"sessions": sessions, "photos": photos})
 
+    @web.get("/api/admin/photo/<session_id>/<path:relative_path>", endpoint="admin_photo")
     @web.get("/api/local-admin/photo/<session_id>/<path:relative_path>")
     def local_admin_photo(session_id, relative_path):
         try:
@@ -1149,6 +1155,7 @@ def create_app(service, admin_port=ADMIN_PORT):
         except ValueError as exc:
             return jsonify({"error": str(exc)}), 404
 
+    @web.post("/api/admin/delete-photos", endpoint="admin_delete_photos")
     @web.post("/api/local-admin/delete-photos")
     def local_admin_delete_photos():
         payload = request.get_json(silent=True) or {}
@@ -1160,6 +1167,12 @@ def create_app(service, admin_port=ADMIN_PORT):
             return jsonify({"moved": moved})
         except (ValueError, RuntimeError, OSError) as exc:
             return jsonify({"error": str(exc)}), 400
+
+    @web.post("/api/admin/shutdown")
+    def admin_shutdown():
+        if not request.is_json:
+            return jsonify({"error": "Expected a JSON request"}), 415
+        return local_admin_shutdown()
 
     @web.post("/api/local-admin/shutdown")
     def local_admin_shutdown():

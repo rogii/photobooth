@@ -4,24 +4,32 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="theme-color" content="#10191a">
-  <title>Photobooth Local Admin</title>
+  <title>{{ "Photobooth Local Admin" if local else "Remove Captures · Photobooth Admin" }}</title>
   <link rel="stylesheet" href="/static/appearance.css">
   <link rel="stylesheet" href="/static/local-admin.css">
-  <link rel="stylesheet" href="/static/pin-dialog.css">
+  {% if local %}<link rel="stylesheet" href="/static/pin-dialog.css">{% endif %}
 </head>
 <body>
-  <main class="wrap">
+  <main class="wrap" data-photo-api="{{ '/api/local-admin' if local else '/api/admin' }}">
     <header class="topbar">
       <div>
+        {% if local %}
         <span class="eyebrow">LOCAL CONTROLS</span>
         <h1>Photobooth admin</h1>
         <p>Manage saved photos and Raspberry Pi access.</p>
+        {% else %}
+        <h1>Remove captures</h1>
+        {% endif %}
       </div>
       <div class="top-actions">
+        {% if local %}
         <a id="kiosk-link" class="button secondary" href="/">Back to kiosk</a>
         <button id="change-pin" class="button secondary" type="button">Change admin PIN</button>
         <button id="exit-kiosk" class="button secondary" type="button">Exit to desktop</button>
         <button id="shutdown" class="button danger" type="button">Shut down Raspberry Pi</button>
+        {% else %}
+        <a class="button secondary" href="{{ url_for('admin') }}">Back to admin</a>
+        {% endif %}
       </div>
     </header>
 
@@ -43,6 +51,7 @@
 
     <div id="message" role="status" aria-live="polite"></div>
   </main>
+  {% if local %}
   <dialog id="change-pin-dialog" class="admin-pin-card" aria-labelledby="change-pin-title">
     <form>
       <h1 id="change-pin-title">Enter new PIN</h1>
@@ -66,6 +75,7 @@
     </form>
   </dialog>
   <script src="/static/pin-keypad.js" defer></script>
+  {% endif %}
   <script src="/static/appearance.js" defer></script>
   <script src="/static/local-admin.js" defer></script>
 </body>
