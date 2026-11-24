@@ -4,8 +4,23 @@ set -euo pipefail
 APP_DIR="$(cd "$(dirname "$0")" && pwd)"
 USER_HOME="$HOME"
 USER_ID="$(id -u)"
+USER_NAME="$(id -un)"
 export XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR:-/run/user/$USER_ID}"
 export DBUS_SESSION_BUS_ADDRESS="${DBUS_SESSION_BUS_ADDRESS:-unix:path=$XDG_RUNTIME_DIR/bus}"
+
+# Allow the user service to configure Wi-Fi even without an active desktop login.
+sudo tee /etc/polkit-1/rules.d/49-photobooth-wifi.rules >/dev/null <<EOF
+polkit.addRule(function(action, subject) {
+    if (subject.user === "$USER_NAME" && [
+        "org.freedesktop.NetworkManager.network-control",
+        "org.freedesktop.NetworkManager.settings.modify.system",
+        "org.freedesktop.NetworkManager.wifi.scan",
+        "org.freedesktop.NetworkManager.wifi.share.protected"
+    ].indexOf(action.id) !== -1) {
+        return polkit.Result.YES;
+    }
+});
+EOF
 
 # Prevent the desktop from claiming the camera through D-Bus activation.
 systemctl --user mask --now gvfs-gphoto2-volume-monitor.service
@@ -29,7 +44,6 @@ EOF
 systemctl --user daemon-reload
 systemctl --user enable --now photobooth.service
 
-USER_NAME="$(id -un)"
 printf '%s ALL=(root) NOPASSWD: /usr/bin/systemctl poweroff, /usr/bin/systemctl reboot\n' "$USER_NAME" \
   | sudo tee /etc/sudoers.d/photobooth-poweroff >/dev/null
 sudo chmod 0440 /etc/sudoers.d/photobooth-poweroff

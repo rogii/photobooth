@@ -10,7 +10,7 @@ USER_NAME="$(id -un)"
 USER_HOME="$HOME"
 
 sudo apt update
-sudo apt install -y python3 python3-venv python3-lgpio python3-gpiozero gphoto2 chromium bluez python3-evdev rfkill
+sudo apt install -y python3 python3-venv python3-lgpio python3-gpiozero gphoto2 chromium bluez python3-evdev rfkill network-manager dnsmasq-base polkitd python3-dbus avahi-daemon
 # The kiosk launcher manages unclutter instead of using Debian's session-wide autostart.
 sudo apt install -y --no-install-recommends unclutter-xfixes
 
