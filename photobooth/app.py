@@ -1138,10 +1138,11 @@ def create_app(service, admin_port=ADMIN_PORT):
         local_admin = {"local_admin_page", "local_admin_photos", "local_admin_photo", "local_admin_delete_photos", "local_admin_shutdown", "local_admin_reboot", "local_admin_change_pin", "local_admin_exit_kiosk"}
         regular_admin.update({"admin_selfie_button", "admin_footer_logos", "admin_activate_footer_logo", "admin_remove_footer_logo", "admin_photos_page", "admin_photos", "admin_photo", "admin_delete_photos", "admin_shutdown"})
         regular_admin.update({"admin_wifi_scan", "admin_wifi_connect"})
+        local_admin.update({"local_admin_wifi_page", "local_admin_wifi_status", "local_admin_wifi_scan", "local_admin_wifi_connect"})
         if request.endpoint in regular_admin and int(request.environ.get("SERVER_PORT", 0)) != admin_port:
             return jsonify({"error": f"Open the admin interface on port {admin_port}"}), 404
         if request.endpoint in local_admin and not session.get("admin_unlocked"):
-            if request.endpoint == "local_admin_page":
+            if request.endpoint in {"local_admin_page", "local_admin_wifi_page"}:
                 kiosk_url = request.url_root.replace(f":{admin_port}/", ":8080/")
                 return redirect(kiosk_url)
             return jsonify({"error": "Admin PIN required"}), 401
@@ -1172,6 +1173,10 @@ def create_app(service, admin_port=ADMIN_PORT):
     def local_admin_page():
         return render_template("admin-photos.html", local=True)
 
+    @web.get("/local-admin/wifi")
+    def local_admin_wifi_page():
+        return render_template("local-admin-wifi.html")
+
     @web.get("/admin/captures")
     def admin_photos_page():
         return render_template("admin-photos.html", local=False)
@@ -1197,6 +1202,13 @@ def create_app(service, admin_port=ADMIN_PORT):
         result["config"]["save_on_camera"] = service.config.get("save_on_camera") is True
         return jsonify(result)
 
+    @web.get("/api/local-admin/wifi")
+    def local_admin_wifi_status():
+        response = jsonify(service.wifi.details())
+        response.headers["Cache-Control"] = "no-store"
+        return response
+
+    @web.post("/api/local-admin/wifi/scan", endpoint="local_admin_wifi_scan")
     @web.post("/api/admin/wifi/scan")
     def admin_wifi_scan():
         try:
@@ -1204,11 +1216,16 @@ def create_app(service, admin_port=ADMIN_PORT):
         except (RuntimeError, ValueError, OSError, subprocess.SubprocessError):
             return jsonify({"error": "Wi-Fi scan unavailable. Enter the network name manually or try again."}), 503
 
+    @web.post("/api/local-admin/wifi/connect", endpoint="local_admin_wifi_connect")
     @web.post("/api/admin/wifi/connect")
     def admin_wifi_connect():
         payload = request.get_json(silent=True)
-        if not isinstance(payload, dict) or not valid_admin_pin(payload.get("pin")):
+        if request.endpoint == "admin_wifi_connect" and (
+            not isinstance(payload, dict) or not valid_admin_pin(payload.get("pin"))
+        ):
             return jsonify({"error": "Invalid admin PIN"}), 401
+        if not isinstance(payload, dict):
+            return jsonify({"error": "Expected a JSON object"}), 400
         try:
             service.wifi.connect(
                 payload.get("ssid"), payload.get("security"), payload.get("password", ""), payload.get("hidden", False),

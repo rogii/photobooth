@@ -28,6 +28,8 @@ Run the installer as the desktop user, not as root. The script installs dependen
 
 The installer stops and masks the desktop user's `gvfs-gphoto2-volume-monitor.service` so automatic camera mounting does not compete with Photobooth for the USB camera.
 
+The installer sets a machine-wide Chromium policy to disable password-saving prompts and password autofill on websites. Existing saved passwords stay in their profiles.
+
 On X11, the kiosk launcher uses `unclutter` to start with the pointer hidden and hide it again after one second of inactivity. On Wayland, the kiosk page hides the pointer within its own window. With labwc 0.8.4 or newer, the installer also configures the compositor to hide the pointer during kiosk use. Restart the desktop session to load the shortcut. The launcher stops the idle timer when the kiosk browser closes. The shortcut generates synthetic keyboard activity while the kiosk is idle, which can keep other desktop idle timers from firing.
 
 The kiosk is available locally on port 8080. The regular admin panel uses port 8081.

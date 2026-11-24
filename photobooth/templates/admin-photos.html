@@ -24,6 +24,7 @@
       <div class="top-actions">
         {% if local %}
         <a id="kiosk-link" class="button secondary" href="/">Back to kiosk</a>
+        <a class="button secondary" href="{{ url_for('local_admin_wifi_page') }}">Wi-Fi setup</a>
         <button id="change-pin" class="button secondary" type="button">Change admin PIN</button>
         <button id="exit-kiosk" class="button secondary" type="button">Exit to desktop</button>
         <button id="reboot" class="button danger" type="button">Restart Raspberry Pi</button>
