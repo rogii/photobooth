@@ -15,11 +15,13 @@ let photoWallLayout = "";
 let pickerOpen = false;
 let capsLock = false;
 let adminHoldTimer = null;
+let adminHoldTarget = null;
 
 function showAdminPin() {
-  adminHoldTimer = null;
-  $("#admin-access").classList.remove("holding");
-  $("#admin-pin-dialog").classList.remove("hidden");
+  const trigger = adminHoldTarget;
+  cancelAdminHold();
+  if (trigger.closest(".hidden")) return;
+  adminPinDialog.classList.remove("hidden");
   adminPinKeypad.reset(state?.admin_pin_length ?? 4);
 }
 
@@ -32,16 +34,18 @@ function openAdminPanel() {
   window.location.assign(adminUrl.toString());
 }
 
-function startAdminHold() {
-  if (adminHoldTimer !== null) return;
-  $("#admin-access").classList.add("holding");
+function startAdminHold(trigger) {
+  if (adminHoldTimer !== null || !adminPinDialog.classList.contains("hidden")) return;
+  adminHoldTarget = trigger;
+  trigger.classList.add("holding");
   adminHoldTimer = window.setTimeout(showAdminPin, 1200);
 }
 
 function cancelAdminHold() {
   if (adminHoldTimer !== null) window.clearTimeout(adminHoldTimer);
   adminHoldTimer = null;
-  $("#admin-access").classList.remove("holding");
+  adminHoldTarget?.classList.remove("holding");
+  adminHoldTarget = null;
 }
 
 async function api(path, body) {
@@ -304,22 +308,26 @@ window.addEventListener("resize", () => {
   updatePhotoWall();
 });
 
-const adminAccess = $("#admin-access");
-adminAccess.addEventListener("pointerdown", (event) => {
-  if (!event.isPrimary || (event.pointerType === "mouse" && event.button !== 0)) return;
-  event.preventDefault();
-  startAdminHold();
-});
-["pointerup", "pointercancel", "pointerleave"].forEach((name) => adminAccess.addEventListener(name, cancelAdminHold));
-adminAccess.addEventListener("keydown", (event) => {
-  if (event.key === "Enter" || event.key === " ") {
-    event.preventDefault();
-    startAdminHold();
-  }
-});
-["keyup", "blur"].forEach((name) => adminAccess.addEventListener(name, cancelAdminHold));
-
 const adminPinDialog = $("#admin-pin-dialog");
+for (const trigger of [$("#admin-access"), $("#camera-admin-access")]) {
+  trigger.addEventListener("pointerdown", (event) => {
+    if (!event.isPrimary || (event.pointerType === "mouse" && event.button !== 0)) return;
+    event.preventDefault();
+    startAdminHold(trigger);
+  });
+  trigger.addEventListener("contextmenu", (event) => event.preventDefault());
+  trigger.addEventListener("keydown", (event) => {
+    if (event.key !== "Enter" && event.key !== " ") return;
+    event.preventDefault();
+    if (!event.repeat) startAdminHold(trigger);
+  });
+  for (const name of ["pointerup", "pointercancel", "pointerleave", "keyup", "blur"]) {
+    trigger.addEventListener(name, () => {
+      if (adminHoldTarget === trigger) cancelAdminHold();
+    });
+  }
+}
+
 adminPinDialog.addEventListener("click", (event) => {
   if (event.target !== adminPinDialog || adminPinKeypad.isPending()) return;
   adminPinDialog.classList.add("hidden");

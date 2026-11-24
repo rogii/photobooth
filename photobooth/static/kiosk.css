@@ -35,7 +35,9 @@
 .internet-stat{cursor:pointer;user-select:none;touch-action:manipulation;transition:color .15s,filter .15s}.internet-stat.holding{color:var(--accent);filter:brightness(1.18)}
 .camera-error-overlay{position:fixed;inset:0;z-index:50;display:grid;place-items:center;padding:24px;background:color-mix(in srgb, var(--scrim) 78%, transparent);backdrop-filter:blur(8px)}
 .camera-error-card{width:min(560px,100%);padding:clamp(28px,5vw,48px);border:1px solid #805649;border-radius:18px;background:linear-gradient(145deg,var(--card),var(--panel));box-shadow:0 28px 100px #000c;text-align:center}
-.camera-error-icon{display:grid;place-items:center;width:54px;height:54px;margin:0 auto 18px;border:2px solid #ff9d7f;border-radius:50%;color:#ff9d7f;font-size:34px;font-weight:800}
+.camera-error-icon{display:grid;place-items:center;width:54px;height:54px;margin:0 auto 18px;padding:0;border:2px solid #ff9d7f;border-radius:50%;background:transparent;color:#ff9d7f;font-family:inherit;font-size:34px;font-weight:800;cursor:pointer;user-select:none;touch-action:manipulation}
+.camera-error-icon.holding{border-color:var(--accent);color:var(--accent)}
+#admin-pin-dialog{z-index:60}
 .camera-error-kicker{margin:0;color:#ffb49b;font-size:10px;font-weight:800;letter-spacing:.2em}
 .camera-error-card h1{margin:10px 0 12px;color:#fffdf4;font-size:clamp(27px,5vw,42px);line-height:1.08;letter-spacing:-.035em}
 .camera-error-card>p:not(.camera-error-kicker){max-width:440px;margin:0 auto;color:var(--text-secondary);font-size:clamp(15px,2.1vw,19px);line-height:1.5;overflow-wrap:anywhere}

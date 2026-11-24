@@ -1085,7 +1085,7 @@ def create_app(service, admin_port=ADMIN_PORT):
     @web.before_request
     def admin_routes():
         regular_admin = {"admin", "save_config", "admin_event", "admin_session_lock", "admin_session_stop", "admin_session_hidden", "admin_session_delete", "admin_session_download", "admin_session_overlay", "admin_session_overlay_pause", "admin_capture", "restart_app", "get_admin_state"}
-        local_admin = {"local_admin_page", "local_admin_photos", "local_admin_photo", "local_admin_delete_photos", "local_admin_shutdown", "local_admin_change_pin", "local_admin_exit_kiosk"}
+        local_admin = {"local_admin_page", "local_admin_photos", "local_admin_photo", "local_admin_delete_photos", "local_admin_shutdown", "local_admin_reboot", "local_admin_change_pin", "local_admin_exit_kiosk"}
         regular_admin.update({"admin_footer_logos", "admin_activate_footer_logo", "admin_remove_footer_logo", "admin_photos_page", "admin_photos", "admin_photo", "admin_delete_photos", "admin_shutdown"})
         if request.endpoint in regular_admin and int(request.environ.get("SERVER_PORT", 0)) != admin_port:
             return jsonify({"error": f"Open the admin interface on port {admin_port}"}), 404
@@ -1176,19 +1176,28 @@ def create_app(service, admin_port=ADMIN_PORT):
 
     @web.post("/api/local-admin/shutdown")
     def local_admin_shutdown():
+        return request_pi_power_action("poweroff", "shutdown", "shutting_down")
+
+    @web.post("/api/local-admin/reboot")
+    def local_admin_reboot():
+        if not request.is_json:
+            return jsonify({"error": "Expected a JSON request"}), 415
+        return request_pi_power_action("reboot", "restart", "restarting")
+
+    def request_pi_power_action(command, action, response_key):
         try:
             result = subprocess.run(
-                ["sudo", "-n", "/usr/bin/systemctl", "poweroff"],
+                ["sudo", "-n", "/usr/bin/systemctl", command],
                 capture_output=True,
                 text=True,
                 timeout=5,
             )
         except (OSError, subprocess.TimeoutExpired) as exc:
-            return jsonify({"error": f"Could not request shutdown: {exc}"}), 500
+            return jsonify({"error": f"Could not request {action}: {exc}"}), 500
         if result.returncode:
-            message = (result.stderr or result.stdout or "Shutdown was not authorized").strip()
+            message = (result.stderr or result.stdout or f"Could not request {action}").strip()
             return jsonify({"error": message}), 500
-        return jsonify({"shutting_down": True}), 202
+        return jsonify({response_key: True}), 202
 
     @web.post("/api/local-admin/pin")
     def local_admin_change_pin():
