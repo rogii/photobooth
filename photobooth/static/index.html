@@ -28,10 +28,6 @@
       <h1>Photobooth ready</h1>
       <p>Choose or create a session to begin.</p>
     </div>
-    <aside id="selfie-wake-prompt" class="selfie-wake-prompt hidden" role="status">
-      <strong>Wake the button</strong>
-      <p>Press the button once to wake it. When this message clears, press it again to take a photo.</p>
-    </aside>
     <footer id="event-footer" class="event-footer hidden">
       <div class="event-heading">
         <img id="footer-logo" class="footer-logo hidden" alt="">
@@ -74,14 +70,28 @@
     <div id="connection-status" class="connection-overlay hidden" role="status" aria-live="polite">
       <div><span class="connection-spinner"></span><h1>CONNECTION LOST</h1><p>Reconnecting to photobooth…</p></div>
     </div>
-    <div id="camera-error" class="camera-error-overlay hidden" role="alert" aria-live="assertive">
-      <section class="camera-error-card">
-        <button id="camera-admin-access" class="camera-error-icon" type="button" aria-label="Hold to open the local admin panel">!</button>
-        <p class="camera-error-kicker">CAMERA CONNECTION</p>
-        <h1>Camera needs attention</h1>
-        <p id="camera-error-detail">The camera is not responding.</p>
-        <p class="camera-error-help">Check that the camera is connected and powered on, then trigger a capture again.</p>
-        <span class="camera-error-wait"><i></i> Checking camera connection…</span>
+    <div id="selfie-wake-prompt" class="connection-prompt-overlay selfie-wake-overlay hidden">
+      <section class="connection-prompt-card">
+        <button id="selfie-admin-access" class="connection-prompt-icon" type="button" aria-label="Hold to open the local admin panel">!</button>
+        <div class="connection-prompt-message" role="status">
+          <p class="connection-prompt-kicker">BUTTON CONNECTION</p>
+          <h1>Wake the button</h1>
+          <p>Press the button once to wake it.</p>
+          <p class="connection-prompt-help">When this message clears, press it again to take a photo.</p>
+          <span class="connection-prompt-wait"><i></i> Waiting for the button to reconnect…</span>
+        </div>
+      </section>
+    </div>
+    <div id="camera-error" class="connection-prompt-overlay hidden" role="alert" aria-live="assertive">
+      <section class="connection-prompt-card">
+        <button id="camera-admin-access" class="connection-prompt-icon" type="button" aria-label="Hold to open the local admin panel">!</button>
+        <div class="connection-prompt-message">
+          <p class="connection-prompt-kicker">CAMERA CONNECTION</p>
+          <h1>Camera needs attention</h1>
+          <p id="camera-error-detail">The camera is not responding.</p>
+          <p class="connection-prompt-help">Check that the camera is connected and powered on, then trigger a capture again.</p>
+          <span class="connection-prompt-wait"><i></i> Checking camera connection…</span>
+        </div>
       </section>
     </div>
     <div id="admin-pin-dialog" class="admin-pin-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="admin-pin-title">
