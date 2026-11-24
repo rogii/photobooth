@@ -769,10 +769,12 @@ class PhotoboothService:
         for path in frames:
             with Image.open(path) as source:
                 images.append(ImageOps.exif_transpose(source).convert("RGB"))
-        tile_w, tile_h = 1200, 675
+        tile_sizes = [(max(1, image.width // 2), max(1, image.height // 2)) for image in images]
+        tile_w = max(width for width, _ in tile_sizes)
+        tile_h = max(height for _, height in tile_sizes)
         canvas = Image.new("RGB", (tile_w * 2, tile_h * 2), "white")
         for index, image in enumerate(images):
-            image = ImageOps.fit(image, (tile_w, tile_h), method=Image.Resampling.LANCZOS)
+            image = image.resize(tile_sizes[index], Image.Resampling.LANCZOS)
             x = (index % 2) * tile_w
             y = (index // 2) * tile_h
             canvas.paste(image, (x, y))
