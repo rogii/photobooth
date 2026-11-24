@@ -1,3 +1,8 @@
+.hide-scrollbars,
+.hide-scrollbars * {
+  scrollbar-width: none;
+}
+
 :root {
   --accent: #e2fa83;
   --accent-ink: #162020;

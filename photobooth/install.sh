@@ -17,10 +17,13 @@ sudo install -D -o root -g root -m 0644 "$APP_DIR/chromium-password-manager.json
 sudo apt install -y --no-install-recommends unclutter-xfixes
 
 if command -v labwc >/dev/null; then
+  CONFIGURE_CURSOR=false
   read -r _ LABWC_VERSION _ <<< "$(labwc --version)"
   if dpkg --compare-versions "$LABWC_VERSION" ge 0.8.4; then
     sudo apt install -y --no-install-recommends swayidle wtype
-    if python3 - <<'PY'
+    CONFIGURE_CURSOR=true
+  fi
+  if ! python3 - "$CONFIGURE_CURSOR" <<'PY'
 import os
 import shutil
 import sys
@@ -33,6 +36,7 @@ config_dirs = (os.environ.get("XDG_CONFIG_DIRS") or "/etc/xdg").split(":")
 config = config_home / "labwc/rc.xml"
 system_configs = [Path(directory) / "labwc/rc.xml" for directory in config_dirs if directory]
 system_configs = [path for path in system_configs if path.is_file()]
+configure_cursor = sys.argv[1] == "true"
 shortcut = "A-W-h"
 marker = " Photobooth cursor shortcut "
 
@@ -51,7 +55,7 @@ def hides_cursor(binding):
     )
 
 if config.is_symlink():
-    sys.exit(f"Labwc cursor setup requires a regular configuration file at {config}.")
+    sys.exit(f"Labwc setup requires a regular configuration file at {config}.")
 
 # Start with the system settings when creating a user override, including on
 # labwc sessions that run without --merge-config.
@@ -61,37 +65,95 @@ root = document.documentElement
 if root.localName not in {"labwc_config", "openbox_config"}:
     sys.exit(f"Unrecognized labwc configuration in {source}.")
 
-existing = bindings(document)
-if any(not hides_cursor(binding) for binding in existing):
-    sys.exit(f"The {shortcut} shortcut is already in use in {source}.")
-if not existing:
-    for path in system_configs:
-        if any(not hides_cursor(binding) for binding in bindings(minidom.parse(str(path)))):
-            sys.exit(f"The {shortcut} shortcut is already in use in {path}.")
-
 def new_element(name):
     qualified_name = f"{root.prefix}:{name}" if root.prefix else name
     return document.createElementNS(root.namespaceURI, qualified_name)
 
-if existing:
-    binding = existing[0]
-else:
-    keyboard = next(
-        (node for node in root.childNodes if node.nodeType == Node.ELEMENT_NODE and node.localName == "keyboard"),
-        None,
-    )
-    if keyboard is None:
-        keyboard = root.appendChild(new_element("keyboard"))
-    binding = keyboard.appendChild(new_element("keybind"))
-    binding.setAttribute("key", shortcut)
-    action = binding.appendChild(new_element("action"))
-    action.setAttribute("name", "HideCursor")
+def elements(parent, name):
+    return [
+        node for node in parent.childNodes
+        if node.nodeType == Node.ELEMENT_NODE and node.localName.lower() == name.lower()
+    ]
 
-has_marker = any(node.nodeType == Node.COMMENT_NODE and node.data == marker for node in binding.childNodes)
-if not has_marker:
-    binding.insertBefore(document.createComment(marker), binding.firstChild)
+def touch_values(touch):
+    values = {name.lower(): touch.getAttribute(name) for name in touch.attributes.keys()}
+    for node in touch.childNodes:
+        if node.nodeType == Node.ELEMENT_NODE:
+            values[node.localName.lower()] = "".join(
+                child.data for child in node.childNodes if child.nodeType in (Node.TEXT_NODE, Node.CDATA_SECTION_NODE)
+            ).strip()
+    return values
 
-if not has_marker or source != config:
+def uses_mouse_emulation(values):
+    return values.get("mouseemulation", "").lower() in {"yes", "true", "on", "1"}
+
+system_roots = [
+    root if path == source else minidom.parse(str(path)).documentElement
+    for path in system_configs
+]
+
+def enable_native_touch():
+    changed = False
+    devices = set()
+    for touch in elements(root, "touch"):
+        values = touch_values(touch)
+        devices.add(values.get("devicename", "").lower())
+        if uses_mouse_emulation(values):
+            for name in list(touch.attributes.keys()):
+                if name.lower() == "mouseemulation":
+                    touch.removeAttribute(name)
+            for node in elements(touch, "mouseEmulation"):
+                touch.removeChild(node)
+            touch.setAttribute("mouseEmulation", "no")
+            changed = True
+
+    # Named system mappings take precedence over a generic touch setting.
+    # Override inherited mappings individually and retain their output assignments.
+    for system_root in system_roots:
+        for touch in reversed(elements(system_root, "touch")):
+            values = touch_values(touch)
+            device = values.get("devicename", "")
+            if device.lower() in devices:
+                continue
+            devices.add(device.lower())
+            if uses_mouse_emulation(values):
+                override = root.appendChild(new_element("touch"))
+                if device:
+                    override.setAttribute("deviceName", device)
+                if output := values.get("maptooutput"):
+                    override.setAttribute("mapToOutput", output)
+                override.setAttribute("mouseEmulation", "no")
+                changed = True
+    return changed
+
+def add_cursor_shortcut():
+    existing = bindings(document)
+    if any(not hides_cursor(binding) for binding in existing):
+        print(f"The {shortcut} shortcut is already in use in {source}.", file=sys.stderr)
+        return False
+    if not existing:
+        for path, system_root in zip(system_configs, system_roots):
+            if any(not hides_cursor(binding) for binding in bindings(system_root)):
+                print(f"The {shortcut} shortcut is already in use in {path}.", file=sys.stderr)
+                return False
+        keyboard = next(iter(elements(root, "keyboard")), None)
+        if keyboard is None:
+            keyboard = root.appendChild(new_element("keyboard"))
+        binding = keyboard.appendChild(new_element("keybind"))
+        binding.setAttribute("key", shortcut)
+        action = binding.appendChild(new_element("action"))
+        action.setAttribute("name", "HideCursor")
+    else:
+        binding = existing[0]
+
+    if not any(node.nodeType == Node.COMMENT_NODE and node.data == marker for node in binding.childNodes):
+        binding.insertBefore(document.createComment(marker), binding.firstChild)
+        return True
+    return source != config
+
+touch_changed = enable_native_touch()
+cursor_changed = configure_cursor and add_cursor_shortcut()
+if touch_changed or cursor_changed:
     config.parent.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(dir=config.parent) as temp_dir:
         pending = Path(temp_dir) / config.name
@@ -99,12 +161,10 @@ if not has_marker or source != config:
         if config.exists():
             shutil.copymode(config, pending)
         pending.replace(config)
+    print("Labwc configuration updated. Restart the desktop session to activate the changes.")
 PY
-    then
-      echo "Labwc cursor hiding is configured. Restart the desktop session to activate it."
-    else
-      echo "Labwc cursor setup was skipped. The Wayland kiosk page can still hide its pointer." >&2
-    fi
+  then
+    echo "Labwc touchscreen and cursor configuration was skipped." >&2
   fi
 fi
 
