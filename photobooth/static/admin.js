@@ -1,10 +1,11 @@
 const $ = (selector) => document.querySelector(selector);
 
 async function api(path, body) {
+  const multipart = body instanceof FormData;
   const response = await fetch(path, {
     method: body ? "POST" : "GET",
-    headers: body ? { "Content-Type": "application/json" } : {},
-    body: body ? JSON.stringify(body) : undefined,
+    headers: body && !multipart ? { "Content-Type": "application/json" } : {},
+    body: multipart ? body : body ? JSON.stringify(body) : undefined,
     cache: "no-store",
   });
   const data = await response.json().catch(() => ({}));
@@ -25,6 +26,7 @@ async function refresh() {
       if (input && document.activeElement !== input && key !== "upload_token") input.value = value;
     }
     renderSessions(state.sessions || [], state.session, state.locked_session);
+    renderFooterLogos(state.footer_logos || [], state.active_footer_logo);
     const overlaySession = state.session;
     $("#overlay-status").textContent = overlaySession
       ? `${overlaySession.name}: ${overlaySession.overlay ? `overlay configured (${overlaySession.overlay})` : "no overlay configured"}`
@@ -90,6 +92,84 @@ function renderSessions(sessions, active, locked) {
     actions.append(activate, download, hide, pin, remove); row.append(info, actions); list.append(row);
   });
 }
+
+let renderedFooterLogos;
+
+async function updateFooterLogos(path, body, message) {
+  const status = $("#footer-logo-message");
+  try {
+    await api(`/api/admin/footer-logos${path}`, body);
+    status.textContent = message;
+    await refresh();
+    return true;
+  } catch (error) {
+    status.textContent = error.message;
+    return false;
+  }
+}
+
+function renderFooterLogos(logos, activeId) {
+  const snapshot = JSON.stringify([logos, activeId]);
+  if (snapshot === renderedFooterLogos) return;
+  renderedFooterLogos = snapshot;
+  const list = $("#footer-logo-list");
+  list.replaceChildren();
+  if (!logos.length) {
+    list.textContent = "No saved logos";
+    return;
+  }
+  for (const { id, name } of logos) {
+    const active = id === activeId;
+    const row = document.createElement("div");
+    row.className = "session-admin-row";
+    const preview = document.createElement("img");
+    preview.className = "footer-logo-preview";
+    preview.src = `/api/footer-logos/${encodeURIComponent(id)}`;
+    preview.alt = "";
+    const label = document.createElement("strong");
+    label.className = "footer-logo-name";
+    label.textContent = active ? `${name} (active)` : name;
+
+    const actions = document.createElement("div");
+    actions.className = "session-admin-actions";
+    const toggle = document.createElement("button");
+    toggle.type = "button";
+    toggle.className = "secondary";
+    toggle.textContent = active ? "Deactivate" : "Activate";
+    toggle.setAttribute("aria-label", `${toggle.textContent} ${name}`);
+    toggle.addEventListener("click", () => updateFooterLogos(
+      "/active", { id: active ? null : id }, active ? "Logo deactivated" : "Logo activated"
+    ));
+    const remove = document.createElement("button");
+    remove.type = "button";
+    remove.className = "danger";
+    remove.textContent = "Remove";
+    remove.setAttribute("aria-label", `Remove ${name}`);
+    remove.addEventListener("click", () => {
+      if (confirm(`Remove “${name}” from the footer logo library?`)) {
+        updateFooterLogos("/remove", { id }, "Logo removed");
+      }
+    });
+    actions.append(toggle, remove);
+    row.append(preview, label, actions);
+    list.append(row);
+  }
+}
+
+$("#footer-logo-form").addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const file = $("#footer-logo-file").files[0];
+  if (!file) return;
+  const button = event.currentTarget.querySelector("button");
+  const form = new FormData();
+  form.set("logo", file);
+  button.disabled = true;
+  try {
+    if (await updateFooterLogos("", form, "Logo uploaded")) $("#footer-logo-file").value = "";
+  } finally {
+    button.disabled = false;
+  }
+});
 
 $("#stop-session").addEventListener("click", async () => {
   try {
