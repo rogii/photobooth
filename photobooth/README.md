@@ -91,6 +91,8 @@ The installer must be run as the desktop user because it installs a user service
 
 ## Wi-Fi setup and fallback hotspot
 
+The installer disables Wi-Fi power saving by default for NetworkManager-managed adapters. The default takes effect on the next Wi-Fi connection and applies to saved profiles that use the system default.
+
 The Pi needs a NetworkManager-managed Wi-Fi adapter with access-point support. If the adapter cannot join a saved Wi-Fi network, the Photobooth service starts a WPA2-protected hotspot after giving NetworkManager about 20 seconds to reconnect. The Photo Wall footer and session picker show when the hotspot is active. The hotspot stays up until you use Wi-Fi setup to join a network.
 
 | Hotspot setting | Value |
