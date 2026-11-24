@@ -159,6 +159,7 @@ class PhotoboothService:
                 "created_at": metadata.get("created_at", ""),
                 "photo_dir": metadata.get("photo_dir", ""),
                 "overlay": metadata.get("overlay", ""),
+                "overlay_paused": bool(metadata.get("overlay_paused", False)),
                 "sort_time": sort_time,
                 "locked": bool(self.locked_session and self.locked_session.get("id") == folder.name),
                 "hidden": bool(metadata.get("hidden", False)),
@@ -193,9 +194,11 @@ class PhotoboothService:
 
     @staticmethod
     def session_from_item(item):
-        return {key: item[key] for key in ("id", "name", "created_at", "hidden", "photo_dir", "overlay") if key in item}
+        return {key: item[key] for key in ("id", "name", "created_at", "hidden", "photo_dir", "overlay", "overlay_paused") if key in item}
 
     def session_overlay_path(self, session):
+        if session.get("overlay_paused"):
+            return None
         filename = session.get("overlay")
         if filename not in ("overlay.png", "overlay.webp"):
             return None
@@ -216,6 +219,7 @@ class PhotoboothService:
                 for name in ("overlay.png", "overlay.webp"):
                     (folder / name).unlink(missing_ok=True)
                 session.pop("overlay", None)
+                session.pop("overlay_paused", None)
             else:
                 if not upload or not upload.filename:
                     raise ValueError("Choose a PNG or WebP overlay image")
@@ -245,13 +249,35 @@ class PhotoboothService:
             self.photo_wall_revision += 1
             return session
 
+    def pause_session_overlay(self, session_id, paused):
+        with self.state_lock:
+            if self.busy:
+                raise RuntimeError("Wait for the current capture to finish")
+            folder = SESSIONS / session_id
+            if folder.name != session_id or folder.is_symlink() or not folder.is_dir():
+                raise ValueError("Session not found")
+            item = next((item for item in self.list_sessions(include_hidden=True) if item["id"] == session_id), None)
+            if not item:
+                raise ValueError("Session not found")
+            session = self.session_from_item(item)
+            if not session.get("overlay"):
+                raise ValueError("This session has no overlay to pause")
+            session["overlay_paused"] = bool(paused)
+            (folder / "session.json").write_text(json.dumps(session, ensure_ascii=False, indent=2))
+            if self.session and self.session.get("id") == session_id:
+                self.session = session
+                self.last_session = dict(session)
+                LAST_SESSION.write_text(json.dumps(session, ensure_ascii=False, indent=2))
+            self.photo_wall_revision += 1
+            return session
+
     def make_overlaid_photo(self, photo, session):
         overlay_path = self.session_overlay_path(session)
         if not overlay_path or not overlay_path.is_file():
             return photo
-        output_dir = photo.parent / "overlays"
+        output_dir = photo.parent / "overlay"
         output_dir.mkdir(parents=True, exist_ok=True)
-        output = output_dir / photo.name
+        output = output_dir / f"{photo.stem}_overlay.jpg"
         with Image.open(photo) as source, Image.open(overlay_path) as overlay_source:
             base = ImageOps.exif_transpose(source).convert("RGBA")
             overlay = ImageOps.exif_transpose(overlay_source).convert("RGBA")
@@ -260,6 +286,17 @@ class PhotoboothService:
             base.alpha_composite(overlay)
             base.convert("RGB").save(output, format="JPEG", quality=92, optimize=True)
         return output
+
+    @staticmethod
+    def photo_display_path(photo):
+        composite = photo.parent / "overlay" / f"{photo.stem}_overlay.jpg"
+        legacy_composite = photo.parent / "overlays" / photo.name
+        legacy_marker = legacy_composite.with_suffix(legacy_composite.suffix + ".overlay.json")
+        if not composite.is_file() and legacy_composite.is_file() and legacy_marker.is_file():
+            composite.parent.mkdir(parents=True, exist_ok=True)
+            legacy_composite.replace(composite)
+            legacy_marker.unlink(missing_ok=True)
+        return composite if composite.is_file() else photo
 
     def session_photo_dir(self, session):
         directory = session.get("photo_dir", "")
@@ -346,7 +383,7 @@ class PhotoboothService:
                 if photo.is_symlink() or not photo.is_file() or photo.suffix.lower() not in (".jpg", ".jpeg"):
                     continue
                 relative = photo.relative_to(folder)
-                if "deleted" in {part.lower() for part in relative.parts}:
+                if {part.lower() for part in relative.parts} & {"deleted", "overlay", "overlays"}:
                     continue
                 try:
                     modified = photo.stat().st_mtime
@@ -378,34 +415,60 @@ class PhotoboothService:
         return root, target, relative
 
     def move_local_admin_photos(self, photos):
-        moved = 0
+        groups = {}
         with self.state_lock:
             if self.busy:
                 raise RuntimeError("Wait for the current capture to finish")
-            seen = set()
             for entry in photos:
                 session_id = str(entry.get("session_id", ""))
                 relative_path = str(entry.get("relative_path", ""))
-                key = (session_id, relative_path)
-                if key in seen:
-                    continue
-                seen.add(key)
                 root, source, relative = self.local_admin_photo_path(session_id, relative_path)
-                deleted_root = root / "deleted"
-                destination = deleted_root / relative
-                destination.parent.mkdir(parents=True, exist_ok=True)
-                if deleted_root.resolve() != root / "deleted" or root not in destination.parent.resolve().parents:
-                    raise ValueError("Invalid deleted photo path")
-                if destination.exists():
-                    index = 1
-                    while True:
-                        candidate = destination.with_name(f"{destination.stem}__{index}{destination.suffix}")
-                        if not candidate.exists():
-                            destination = candidate
-                            break
-                        index += 1
-                shutil.move(str(source), str(destination))
-                moved += 1
+                paired_paths = {relative}
+                if len(relative.parts) == 2 and relative.parts[0] == "overlay" and relative.stem.endswith("_overlay"):
+                    original_name = relative.stem.removesuffix("_overlay") + relative.suffix
+                    original = Path(original_name)
+                    original_path = root / original
+                    if original_path.is_file() and not original_path.is_symlink():
+                        paired_paths.add(original)
+                    group_relative = original
+                else:
+                    group_relative = relative
+                    if len(relative.parts) == 1 and relative.suffix.lower() in (".jpg", ".jpeg"):
+                        overlay_relative = Path("overlay") / f"{relative.stem}_overlay.jpg"
+                        overlay_path = root / overlay_relative
+                        if overlay_path.is_file() and not overlay_path.is_symlink():
+                            paired_paths.add(overlay_relative)
+                group_key = (session_id, group_relative.as_posix())
+                group = groups.setdefault(group_key, {"root": root, "paths": set()})
+                group["paths"].update(paired_paths)
+
+            moved = 0
+            for group in groups.values():
+                root = group["root"]
+                group_moved = False
+                for relative in group["paths"]:
+                    source = root / relative
+                    if not source.is_file() or source.is_symlink():
+                        continue
+                    if root not in source.resolve().parents:
+                        raise ValueError("Invalid photo path")
+                    deleted_root = root / "deleted"
+                    destination = deleted_root / relative
+                    destination.parent.mkdir(parents=True, exist_ok=True)
+                    if deleted_root.resolve() != root / "deleted" or root not in destination.parent.resolve().parents:
+                        raise ValueError("Invalid deleted photo path")
+                    if destination.exists():
+                        index = 1
+                        while True:
+                            candidate = destination.with_name(f"{destination.stem}__{index}{destination.suffix}")
+                            if not candidate.exists():
+                                destination = candidate
+                                break
+                            index += 1
+                    shutil.move(str(source), str(destination))
+                    group_moved = True
+                if group_moved:
+                    moved += 1
             if moved:
                 self.photo_wall_revision += 1
         return moved
@@ -471,10 +534,9 @@ class PhotoboothService:
         files = sorted(folder.glob("*.jpg"), key=lambda path: path.name, reverse=True)
         columns = max(1, min(12, int(self.config.get("idle_photo_wall_columns", 3))))
         files = files[:columns * max(1, min(12, int(rows)))]
-        overlay = self.session_overlay_path(event)
         result = []
         for path in files:
-            display = self.make_overlaid_photo(path, event) if overlay and overlay.is_file() else path
+            display = self.photo_display_path(path)
             relative = display.relative_to(folder).as_posix()
             result.append({"name": path.name, "url": f"/api/photos/{folder.name}/{relative}"})
         return result
@@ -660,7 +722,7 @@ class PhotoboothService:
                             if self.flash:
                                 self.flash.on()
                                 time.sleep(float(self.config.get("flash_seconds", 0.18)))
-                            capture_result["photo"] = self.capture_one(photo_wall_visible=(count == 1))
+                            capture_result["photo"] = self.capture_one()
                         except Exception as exc:
                             capture_result["error"] = exc
                         finally:
@@ -708,6 +770,7 @@ class PhotoboothService:
                     raise capture_result["error"]
                 photo = capture_result["photo"]
                 files.append(photo)
+                self.make_overlaid_photo(photo, self.session)
                 if index + 1 < count:
                     time.sleep(interval)
             result = self.make_result(files)
@@ -758,11 +821,9 @@ class PhotoboothService:
                     self.photo_number = 0
                     self.photo_total = 0
 
-    def capture_one(self, photo_wall_visible=True):
+    def capture_one(self):
         session = self.session
         folder = self.session_photo_dir(session)
-        if not photo_wall_visible:
-            folder = folder / "singles"
         folder.mkdir(parents=True, exist_ok=True)
         path = folder / f"{datetime.now().strftime('%Y%m%d-%H%M%S-%f')}.jpg"
         if self.demo:
@@ -884,7 +945,7 @@ def create_app(service, admin_port=ADMIN_PORT):
 
     @web.before_request
     def admin_routes():
-        regular_admin = {"admin", "save_config", "admin_event", "admin_session_lock", "admin_session_stop", "admin_session_hidden", "admin_session_delete", "admin_session_download", "admin_session_overlay", "admin_capture", "restart_app", "get_admin_state"}
+        regular_admin = {"admin", "save_config", "admin_event", "admin_session_lock", "admin_session_stop", "admin_session_hidden", "admin_session_delete", "admin_session_download", "admin_session_overlay", "admin_session_overlay_pause", "admin_capture", "restart_app", "get_admin_state"}
         local_admin = {"local_admin_page", "local_admin_photos", "local_admin_photo", "local_admin_delete_photos", "local_admin_shutdown", "local_admin_change_pin"}
         if request.endpoint in regular_admin and int(request.environ.get("SERVER_PORT", 0)) != admin_port:
             return jsonify({"error": f"Open the admin interface on port {admin_port}"}), 404
@@ -934,7 +995,7 @@ def create_app(service, admin_port=ADMIN_PORT):
     def local_admin_photo(session_id, relative_path):
         try:
             _, photo, _ = service.local_admin_photo_path(session_id, relative_path)
-            return send_file(photo, mimetype="image/jpeg", max_age=0)
+            return send_file(service.photo_display_path(photo), mimetype="image/jpeg", max_age=0)
         except ValueError as exc:
             return jsonify({"error": str(exc)}), 404
 
@@ -1019,6 +1080,15 @@ def create_app(service, admin_port=ADMIN_PORT):
         try:
             remove = request.form.get("remove") == "1"
             overlay = service.set_session_overlay(session_id, request.files.get("overlay"), remove=remove)
+            return jsonify({"session": overlay})
+        except (ValueError, RuntimeError, OSError) as exc:
+            return jsonify({"error": str(exc)}), 400
+
+    @web.post("/api/admin/session-overlay/<session_id>/pause")
+    def admin_session_overlay_pause(session_id):
+        payload = request.get_json(silent=True) or {}
+        try:
+            overlay = service.pause_session_overlay(session_id, payload.get("paused"))
             return jsonify({"session": overlay})
         except (ValueError, RuntimeError, OSError) as exc:
             return jsonify({"error": str(exc)}), 400
