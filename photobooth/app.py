@@ -287,6 +287,17 @@ class PhotoboothService:
             base.convert("RGB").save(output, format="JPEG", quality=92, optimize=True)
         return output
 
+    @staticmethod
+    def photo_display_path(photo):
+        composite = photo.parent / "overlay" / f"{photo.stem}_overlay.jpg"
+        legacy_composite = photo.parent / "overlays" / photo.name
+        legacy_marker = legacy_composite.with_suffix(legacy_composite.suffix + ".overlay.json")
+        if not composite.is_file() and legacy_composite.is_file() and legacy_marker.is_file():
+            composite.parent.mkdir(parents=True, exist_ok=True)
+            legacy_composite.replace(composite)
+            legacy_marker.unlink(missing_ok=True)
+        return composite if composite.is_file() else photo
+
     def session_photo_dir(self, session):
         directory = session.get("photo_dir", "")
         candidate = DATA / directory if directory and Path(directory).name == directory and directory not in (".", "..") else None
@@ -372,7 +383,7 @@ class PhotoboothService:
                 if photo.is_symlink() or not photo.is_file() or photo.suffix.lower() not in (".jpg", ".jpeg"):
                     continue
                 relative = photo.relative_to(folder)
-                if "deleted" in {part.lower() for part in relative.parts}:
+                if {part.lower() for part in relative.parts} & {"deleted", "overlay", "overlays"}:
                     continue
                 try:
                     modified = photo.stat().st_mtime
@@ -525,14 +536,7 @@ class PhotoboothService:
         files = files[:columns * max(1, min(12, int(rows)))]
         result = []
         for path in files:
-            composite = path.parent / "overlay" / f"{path.stem}_overlay.jpg"
-            legacy_composite = path.parent / "overlays" / path.name
-            legacy_marker = legacy_composite.with_suffix(legacy_composite.suffix + ".overlay.json")
-            if not composite.is_file() and legacy_composite.is_file() and legacy_marker.is_file():
-                composite.parent.mkdir(parents=True, exist_ok=True)
-                legacy_composite.replace(composite)
-                legacy_marker.unlink(missing_ok=True)
-            display = composite if composite.is_file() else path
+            display = self.photo_display_path(path)
             relative = display.relative_to(folder).as_posix()
             result.append({"name": path.name, "url": f"/api/photos/{folder.name}/{relative}"})
         return result
@@ -991,7 +995,7 @@ def create_app(service, admin_port=ADMIN_PORT):
     def local_admin_photo(session_id, relative_path):
         try:
             _, photo, _ = service.local_admin_photo_path(session_id, relative_path)
-            return send_file(photo, mimetype="image/jpeg", max_age=0)
+            return send_file(service.photo_display_path(photo), mimetype="image/jpeg", max_age=0)
         except ValueError as exc:
             return jsonify({"error": str(exc)}), 404
 
