@@ -404,34 +404,60 @@ class PhotoboothService:
         return root, target, relative
 
     def move_local_admin_photos(self, photos):
-        moved = 0
+        groups = {}
         with self.state_lock:
             if self.busy:
                 raise RuntimeError("Wait for the current capture to finish")
-            seen = set()
             for entry in photos:
                 session_id = str(entry.get("session_id", ""))
                 relative_path = str(entry.get("relative_path", ""))
-                key = (session_id, relative_path)
-                if key in seen:
-                    continue
-                seen.add(key)
                 root, source, relative = self.local_admin_photo_path(session_id, relative_path)
-                deleted_root = root / "deleted"
-                destination = deleted_root / relative
-                destination.parent.mkdir(parents=True, exist_ok=True)
-                if deleted_root.resolve() != root / "deleted" or root not in destination.parent.resolve().parents:
-                    raise ValueError("Invalid deleted photo path")
-                if destination.exists():
-                    index = 1
-                    while True:
-                        candidate = destination.with_name(f"{destination.stem}__{index}{destination.suffix}")
-                        if not candidate.exists():
-                            destination = candidate
-                            break
-                        index += 1
-                shutil.move(str(source), str(destination))
-                moved += 1
+                paired_paths = {relative}
+                if len(relative.parts) == 2 and relative.parts[0] == "overlay" and relative.stem.endswith("_overlay"):
+                    original_name = relative.stem.removesuffix("_overlay") + relative.suffix
+                    original = Path(original_name)
+                    original_path = root / original
+                    if original_path.is_file() and not original_path.is_symlink():
+                        paired_paths.add(original)
+                    group_relative = original
+                else:
+                    group_relative = relative
+                    if len(relative.parts) == 1 and relative.suffix.lower() in (".jpg", ".jpeg"):
+                        overlay_relative = Path("overlay") / f"{relative.stem}_overlay.jpg"
+                        overlay_path = root / overlay_relative
+                        if overlay_path.is_file() and not overlay_path.is_symlink():
+                            paired_paths.add(overlay_relative)
+                group_key = (session_id, group_relative.as_posix())
+                group = groups.setdefault(group_key, {"root": root, "paths": set()})
+                group["paths"].update(paired_paths)
+
+            moved = 0
+            for group in groups.values():
+                root = group["root"]
+                group_moved = False
+                for relative in group["paths"]:
+                    source = root / relative
+                    if not source.is_file() or source.is_symlink():
+                        continue
+                    if root not in source.resolve().parents:
+                        raise ValueError("Invalid photo path")
+                    deleted_root = root / "deleted"
+                    destination = deleted_root / relative
+                    destination.parent.mkdir(parents=True, exist_ok=True)
+                    if deleted_root.resolve() != root / "deleted" or root not in destination.parent.resolve().parents:
+                        raise ValueError("Invalid deleted photo path")
+                    if destination.exists():
+                        index = 1
+                        while True:
+                            candidate = destination.with_name(f"{destination.stem}__{index}{destination.suffix}")
+                            if not candidate.exists():
+                                destination = candidate
+                                break
+                            index += 1
+                    shutil.move(str(source), str(destination))
+                    group_moved = True
+                if group_moved:
+                    moved += 1
             if moved:
                 self.photo_wall_revision += 1
         return moved
