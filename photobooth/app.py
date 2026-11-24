@@ -24,6 +24,8 @@ from pathlib import Path
 from flask import Flask, jsonify, redirect, render_template, request, send_file, send_from_directory, session
 from PIL import Image, ImageDraw, ImageOps
 
+from selfie_button import SelfieButton
+
 BASE = Path(__file__).resolve().parent
 CONFIG_PATH = BASE / "config.json"
 DATA = Path(os.environ.get("PHOTOBOOTH_DATA", Path.home() / "Photobooth"))
@@ -100,6 +102,8 @@ class PhotoboothService:
         self.status = "Choose or create a session"
         self.countdown = ""
         self.session = None
+        self.selfie_connected = False
+        self.selfie_seen = False
         self.last_session = self._read_last_session()
         self.locked_session = self._read_session_file(LOCKED_SESSION)
         if self.locked_session:
@@ -131,10 +135,28 @@ class PhotoboothService:
         DATA.mkdir(parents=True, exist_ok=True)
         SESSIONS.mkdir(parents=True, exist_ok=True)
         UPLOAD_QUEUE.mkdir(parents=True, exist_ok=True)
+        self.selfie_button = SelfieButton(
+            DATA / ".selfie-button", self.stop_event, self.set_selfie_connection,
+            self.capture_from_selfie_button, enabled=not self.demo,
+        )
         self._init_gpio()
         if not self.demo:
             threading.Thread(target=self.camera_health_worker, daemon=True, name="camera-health").start()
         threading.Thread(target=self.upload_worker, daemon=True, name="upload-queue").start()
+
+    def set_selfie_connection(self, connected):
+        with self.state_lock:
+            self.selfie_connected = connected
+            if connected and self.session:
+                self.selfie_seen = True
+
+    def capture_from_selfie_button(self):
+        try:
+            delay = max(0, min(30, int(self.config.get("countdown_seconds", 3))))
+            self.start_capture(1, delay, 0)
+        except (RuntimeError, ValueError):
+            # A press during another capture or before session selection is ignored.
+            pass
 
     def camera_health_worker(self):
         """Keep checking the camera so the kiosk can recover after USB reconnects."""
@@ -457,6 +479,7 @@ class PhotoboothService:
                     continue
             if self.session and self.session.get("id") == session_id:
                 self.session = None
+                self.selfie_seen = False
                 self.status = "Choose or create a session"
                 self.phase = "idle"
             if self.last_session and self.last_session.get("id") == session_id:
@@ -613,6 +636,8 @@ class PhotoboothService:
             )
             photo_wall_version = f"{session['id'] if session else 'none'}:{self.photo_wall_revision}"
             photo_wall_columns = max(1, min(12, int(self.config.get("idle_photo_wall_columns", 3))))
+            selfie_configured = bool(self.selfie_button.address)
+            selfie_connected = selfie_configured and self.selfie_connected
             return {
                 "session": session,
                 "last_session": dict(self.last_session) if self.last_session else None,
@@ -627,6 +652,12 @@ class PhotoboothService:
                 "gallery_upload_configured": bool(self.config.get("upload_url", "").strip()),
                 "capture_count": capture_count,
                 "flash_available": self.flash_available,
+                "selfie_button_connected": selfie_connected,
+                "selfie_button_configured": selfie_configured,
+                "selfie_button_status": (
+                    ("connected" if selfie_connected else "disconnected")
+                    if self.selfie_seen and session else None
+                ),
                 "camera_available": self.camera_available,
                 "camera_error": self.camera_error,
                 "demo": self.demo,
@@ -714,6 +745,11 @@ class PhotoboothService:
         with self.state_lock:
             self.countdown = value
 
+    def activate_session(self, selected):
+        if not self.session or selected["id"] != self.session["id"]:
+            self.selfie_seen = self.selfie_connected
+        self.session = selected
+
     def create_session(self, name):
         if not name or not name.strip():
             raise ValueError("Enter a session name")
@@ -721,6 +757,7 @@ class PhotoboothService:
             if self.busy:
                 raise RuntimeError("Wait for the current capture to finish")
             now = datetime.now()
+            self.selfie_seen = self.selfie_connected
             self.session = {
                 "id": f"{now.strftime('%Y%m%d-%H%M%S')}-{uuid.uuid4().hex[:6]}",
                 "name": name.strip(),
@@ -748,7 +785,7 @@ class PhotoboothService:
                 raise ValueError("Session not found")
             if item["hidden"] and not allow_hidden:
                 raise ValueError("This session is hidden from kiosk selection")
-            self.session = self.session_from_item(item)
+            self.activate_session(self.session_from_item(item))
             self.last_session = dict(self.session)
             self.status = f"Session resumed · {self.session['name']}"
             LAST_SESSION.write_text(json.dumps(self.session, ensure_ascii=False, indent=2))
@@ -767,7 +804,7 @@ class PhotoboothService:
                 if not item:
                     raise ValueError("Session not found")
                 self.locked_session = self.session_from_item(item)
-                self.session = dict(self.locked_session)
+                self.activate_session(dict(self.locked_session))
                 self.last_session = dict(self.session)
                 LAST_SESSION.write_text(json.dumps(self.session, ensure_ascii=False, indent=2))
                 LOCKED_SESSION.write_text(json.dumps(self.locked_session, ensure_ascii=False, indent=2))
@@ -775,6 +812,7 @@ class PhotoboothService:
             else:
                 self.locked_session = None
                 self.session = None
+                self.selfie_seen = False
                 self.last_session = None
                 self.status = "Choose or create a session"
                 self.phase = "idle"
@@ -787,6 +825,7 @@ class PhotoboothService:
             if self.busy:
                 raise RuntimeError("Wait for the current capture to finish")
             self.session = None
+            self.selfie_seen = False
             self.last_session = None
             self.locked_session = None
             self.status = "Choose or create a session"
@@ -804,7 +843,7 @@ class PhotoboothService:
                 raise RuntimeError("Wait for the current capture to finish")
             if not self.last_session:
                 raise ValueError("There is no previous session to resume")
-            self.session = dict(self.last_session)
+            self.activate_session(dict(self.last_session))
             self.status = f"Session resumed · {self.session['name']}"
             return dict(self.session)
 
@@ -1086,7 +1125,7 @@ def create_app(service, admin_port=ADMIN_PORT):
     def admin_routes():
         regular_admin = {"admin", "save_config", "admin_event", "admin_session_lock", "admin_session_stop", "admin_session_hidden", "admin_session_delete", "admin_session_download", "admin_session_overlay", "admin_session_overlay_pause", "admin_capture", "restart_app", "get_admin_state"}
         local_admin = {"local_admin_page", "local_admin_photos", "local_admin_photo", "local_admin_delete_photos", "local_admin_shutdown", "local_admin_reboot", "local_admin_change_pin", "local_admin_exit_kiosk"}
-        regular_admin.update({"admin_footer_logos", "admin_activate_footer_logo", "admin_remove_footer_logo", "admin_photos_page", "admin_photos", "admin_photo", "admin_delete_photos", "admin_shutdown"})
+        regular_admin.update({"admin_selfie_button", "admin_footer_logos", "admin_activate_footer_logo", "admin_remove_footer_logo", "admin_photos_page", "admin_photos", "admin_photo", "admin_delete_photos", "admin_shutdown"})
         if request.endpoint in regular_admin and int(request.environ.get("SERVER_PORT", 0)) != admin_port:
             return jsonify({"error": f"Open the admin interface on port {admin_port}"}), 404
         if request.endpoint in local_admin and not session.get("admin_unlocked"):
@@ -1330,6 +1369,25 @@ def create_app(service, admin_port=ADMIN_PORT):
         except ValueError as exc:
             return jsonify({"error": str(exc)}), 404
 
+    @web.route("/api/admin/selfie-button", methods=["GET", "POST"])
+    def admin_selfie_button():
+        try:
+            if request.method == "GET":
+                return jsonify({"devices": service.selfie_button.devices()})
+            payload = request.get_json()
+            if isinstance(payload, dict) and payload.get("forget") is True:
+                service.selfie_button.forget()
+                return jsonify({"forgotten": True})
+            if isinstance(payload, dict) and payload.get("scan") is True:
+                service.selfie_button.scan()
+                return jsonify({"scanning": True}), 202
+            service.selfie_button.pair(payload.get("address") if isinstance(payload, dict) else None)
+            return jsonify({"paired": True})
+        except (ValueError, RuntimeError) as exc:
+            return jsonify({"error": str(exc)}), 400
+        except OSError:
+            return jsonify({"error": "Could not save the selfie button selection."}), 500
+
     @web.post("/api/admin/capture")
     def admin_capture():
         payload = request.get_json(silent=True) or {}
@@ -1373,7 +1431,7 @@ def create_app(service, admin_port=ADMIN_PORT):
     @web.get("/api/state")
     def get_state():
         state = service.state()
-        public = {key: state[key] for key in ("session", "busy", "status", "countdown", "photo_number", "photo_total", "recent_photo", "recent_photo_version", "phase", "photo_wall_version", "photo_wall_columns", "active_footer_logo", "capture_count", "queued_uploads", "gallery_upload_configured", "sessions", "locked_session", "host_info", "camera_available", "camera_error")}
+        public = {key: state[key] for key in ("session", "busy", "status", "countdown", "photo_number", "photo_total", "recent_photo", "recent_photo_version", "phase", "photo_wall_version", "photo_wall_columns", "active_footer_logo", "capture_count", "queued_uploads", "gallery_upload_configured", "sessions", "locked_session", "host_info", "camera_available", "camera_error", "selfie_button_status")}
         public["server_instance_id"] = SERVER_INSTANCE_ID
         public["admin_pin_length"] = len(str(service.config.get("admin_pin", "1234")))
         public["keys"] = {"single": service.config.get("key_single", "a"), "sequence": service.config.get("key_sequence", "b")}

@@ -66,3 +66,17 @@ gphoto2 --capture-preview --filename /tmp/preview.jpg
 Change the single-photo countdown, the separate countdown before each frame in a four-photo sequence, camera pre-trigger, interval, number of columns in the idle Photo Wall, and display time in the admin panel. Camera pre-trigger starts the gPhoto2 command the selected number of seconds before the countdown reaches zero; it can be calibrated separately for the camera and environment. Changes are saved persistently to `config.json`. Other hardware and upload settings remain in the same file.
 
 The installer must be run as the desktop user because it installs a user service and an autostart file in that user's home directory.
+
+## Bluetooth selfie button
+
+1. Run `./install.sh` on the Pi to install BlueZ and Linux input support. Reboot after the installer adds the user to the Bluetooth input group.
+2. On a phone or computer on the same network, open the Pi's admin page on port 8081. Put the selfie button in pairing mode, then use **Bluetooth selfie button → Scan for buttons**.
+3. Choose the remote by name or Bluetooth address and select **Pair or reconnect**. Wait for **Selfie button connected**, then press the button with a photo session active.
+
+On Raspberry Pi OS desktops using `wf-panel-pi`, the installer removes the Bluetooth widget from the kiosk user's panel so it cannot open a connection dialog over the kiosk. Pairing is available in Photobooth Admin. Restart the desktop session if it was already running during installation.
+
+Either volume key starts one photo with the configured single-photo countdown. Holding the button and pressing it during a capture are ignored after the initial press. The button works while the kiosk browser is unfocused. The selected remote is saved across restarts. Wake the remote to reconnect or use **Pair or reconnect** from admin.
+
+The Photo Wall footer shows **Connected** or **Disconnected** after the remote has connected during the active photo session. The indicator stays hidden until that first connection.
+
+Select **Forget button** in the admin panel to remove the pairing from the Pi and clear Photobooth's saved selection. Scan and pair again to use the remote.
