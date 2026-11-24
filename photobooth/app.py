@@ -51,6 +51,8 @@ class PhotoboothService:
         self.demo = demo
         self.camera_lock = threading.Lock()
         self.state_lock = threading.Lock()
+        self.camera_available = bool(demo)
+        self.camera_error = "" if demo else "Checking camera connection…"
         self.stop_event = threading.Event()
         self.busy = False
         self.status = "Choose or create a session"
@@ -80,7 +82,37 @@ class PhotoboothService:
         SESSIONS.mkdir(parents=True, exist_ok=True)
         UPLOAD_QUEUE.mkdir(parents=True, exist_ok=True)
         self._init_gpio()
+        if not self.demo:
+            threading.Thread(target=self.camera_health_worker, daemon=True, name="camera-health").start()
         threading.Thread(target=self.upload_worker, daemon=True, name="upload-queue").start()
+
+    def camera_health_worker(self):
+        """Keep checking the camera so the kiosk can recover after USB reconnects."""
+        while not self.stop_event.is_set():
+            command = self.config.get("camera_command", "gphoto2")
+            available = False
+            error = ""
+            if not shutil.which(command):
+                error = f"Cannot find {command}; install gPhoto2."
+            elif self.camera_lock.acquire(timeout=0.2):
+                try:
+                    result = subprocess.run(
+                        [command, "--summary"], capture_output=True, text=True, timeout=8
+                    )
+                    available = result.returncode == 0
+                    if not available:
+                        error = (result.stderr or result.stdout or "Camera did not respond.").strip()[-400:]
+                except (OSError, subprocess.TimeoutExpired) as exc:
+                    error = str(exc) or "Camera did not respond."
+                finally:
+                    self.camera_lock.release()
+            else:
+                self.stop_event.wait(2)
+                continue
+            with self.state_lock:
+                self.camera_available = available
+                self.camera_error = "" if available else error
+            self.stop_event.wait(3)
 
     def _read_last_session(self):
         try:
@@ -418,6 +450,8 @@ class PhotoboothService:
                 "gallery_upload_configured": bool(self.config.get("upload_url", "").strip()),
                 "capture_count": capture_count,
                 "flash_available": self.flash_available,
+                "camera_available": self.camera_available,
+                "camera_error": self.camera_error,
                 "demo": self.demo,
                 "phase": self.phase,
                 "photo_number": self.photo_number,
@@ -705,6 +739,9 @@ class PhotoboothService:
                 self.photo_total = 0
                 result_ready = True
         except Exception as exc:
+            with self.state_lock:
+                self.camera_available = False
+                self.camera_error = str(exc)
             self.set_status(f"Capture failed · {exc}")
         finally:
             if self.flash:
@@ -1036,7 +1073,7 @@ def create_app(service, admin_port=ADMIN_PORT):
     @web.get("/api/state")
     def get_state():
         state = service.state()
-        public = {key: state[key] for key in ("session", "busy", "status", "countdown", "photo_number", "photo_total", "recent_photo", "recent_photo_version", "phase", "photo_wall_version", "photo_wall_columns", "capture_count", "queued_uploads", "gallery_upload_configured", "sessions", "locked_session", "host_info")}
+        public = {key: state[key] for key in ("session", "busy", "status", "countdown", "photo_number", "photo_total", "recent_photo", "recent_photo_version", "phase", "photo_wall_version", "photo_wall_columns", "capture_count", "queued_uploads", "gallery_upload_configured", "sessions", "locked_session", "host_info", "camera_available", "camera_error")}
         public["server_instance_id"] = SERVER_INSTANCE_ID
         public["keys"] = {"single": service.config.get("key_single", "a"), "sequence": service.config.get("key_sequence", "b")}
         return jsonify(public)

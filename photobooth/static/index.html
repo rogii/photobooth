@@ -57,6 +57,16 @@
     <div id="connection-status" class="connection-overlay hidden" role="status" aria-live="polite">
       <div><span class="connection-spinner"></span><h1>CONNECTION LOST</h1><p>Reconnecting to photobooth…</p></div>
     </div>
+    <div id="camera-error" class="camera-error-overlay hidden" role="alert" aria-live="assertive">
+      <section class="camera-error-card">
+        <span class="camera-error-icon" aria-hidden="true">!</span>
+        <p class="camera-error-kicker">CAMERA CONNECTION</p>
+        <h1>Camera needs attention</h1>
+        <p id="camera-error-detail">The camera is not responding.</p>
+        <p class="camera-error-help">Check that the camera is connected and powered on, then trigger a capture again.</p>
+        <span class="camera-error-wait"><i></i> Checking camera connection…</span>
+      </section>
+    </div>
     <div id="admin-pin-dialog" class="admin-pin-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="admin-pin-title">
       <form id="admin-pin-form" class="admin-pin-card">
         <span class="picker-kicker">ADMIN ACCESS</span>
