@@ -1477,6 +1477,7 @@ def create_app(service, admin_port=ADMIN_PORT):
         state = service.state()
         public = {key: state[key] for key in ("session", "busy", "status", "countdown", "photo_number", "photo_total", "recent_photo", "recent_photo_version", "phase", "photo_wall_version", "photo_wall_columns", "active_footer_logo", "capture_count", "queued_uploads", "gallery_upload_configured", "sessions", "locked_session", "host_info", "camera_available", "camera_error", "selfie_button_status")}
         public["server_instance_id"] = SERVER_INSTANCE_ID
+        public["selfie_button_configured"] = state["selfie_button_configured"]
         public["admin_pin_length"] = len(str(service.config.get("admin_pin", "1234")))
         public["keys"] = {"single": service.config.get("key_single", "a"), "sequence": service.config.get("key_sequence", "b")}
         return jsonify(public)

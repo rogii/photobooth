@@ -84,6 +84,9 @@ function render(current) {
     : queuedUploads > 0 ? "GALLERY UPLOADS PENDING" : "GALLERY UP TO DATE";
   $("#upload-count").textContent = queuedUploads > 0 ? `${queuedUploads} queued` : "";
   const selfieStatus = current.selfie_button_status;
+  const showSelfieWakePrompt = current.session && current.phase === "idle" &&
+    !cameraFailed && current.selfie_button_configured && selfieStatus !== "connected";
+  $("#selfie-wake-prompt").classList.toggle("hidden", !showSelfieWakePrompt);
   $("#selfie-stat").classList.toggle("hidden", !selfieStatus);
   $("#selfie-divider").classList.toggle("hidden", !selfieStatus);
   const selfieLabel = selfieStatus ? selfieStatus.toUpperCase() : "";
