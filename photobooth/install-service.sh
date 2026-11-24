@@ -58,7 +58,7 @@ Icon=camera-photo
 Terminal=false
 Categories=Graphics;Photography;
 EOF
-install -m 0644 "$KIOSK_ENTRY" "$AUTOSTART_DIR/photobooth.desktop"
+sed '/^Exec=/s/$/ --desktop-autostart/' "$KIOSK_ENTRY" > "$AUTOSTART_DIR/photobooth.desktop"
 if [[ -n "$DESKTOP_DIR" && "${DESKTOP_DIR%/}" != "${USER_HOME%/}" ]]; then
   install -D -m 0755 "$KIOSK_ENTRY" "$DESKTOP_DIR/photobooth.desktop"
 fi

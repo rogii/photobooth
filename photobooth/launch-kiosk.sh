@@ -2,6 +2,13 @@
 set -euo pipefail
 
 APP_DIR="$(cd "$(dirname "$0")" && pwd)"
+if [[ "${1:-}" == --desktop-autostart && -n "${LABWC_PID:-}" &&
+      -x "${XDG_CONFIG_HOME:-$HOME/.config}/labwc/photobooth-kiosk" ]] &&
+    grep -Fxqs 'kiosk_start="${XDG_CONFIG_HOME:-$HOME/.config}/labwc/photobooth-kiosk"' /etc/xdg/labwc/autostart; then
+  # The labwc startup script launches the kiosk with its splash background.
+  exit 0
+fi
+
 BROWSER="$(command -v chromium || command -v chromium-browser || true)"
 if [[ -z "$BROWSER" ]]; then
   echo "Chromium was not found. Install it with: sudo apt install chromium" >&2
@@ -36,12 +43,6 @@ KIOSK_URL="http://127.0.0.1:8080"
 CURSOR_HELPER_PID=""
 if [[ "${XDG_SESSION_TYPE:-}" == wayland || -n "${WAYLAND_DISPLAY:-}" ]]; then
   KIOSK_URL="$KIOSK_URL/?hide_cursor=1"
-  LABWC_CONFIG="${XDG_CONFIG_HOME:-$HOME/.config}/labwc/rc.xml"
-  if [[ -n "${LABWC_PID:-}" ]] && command -v swayidle >/dev/null && command -v wtype >/dev/null &&
-      grep -qsF '<!-- Photobooth cursor shortcut -->' "$LABWC_CONFIG"; then
-    swayidle -C /dev/null timeout 1 'wtype -M alt -M logo -k h -m logo -m alt' 9>&- &
-    CURSOR_HELPER_PID=$!
-  fi
 elif [[ -n "${DISPLAY:-}" ]] && command -v unclutter >/dev/null; then
   unclutter --start-hidden --timeout 1 --hide-on-touch 9>&- &
   CURSOR_HELPER_PID=$!
@@ -56,7 +57,9 @@ cleanup() {
 }
 trap cleanup EXIT
 
-"$BROWSER" --kiosk --user-data-dir="$PROFILE_DIR" --no-first-run --noerrdialogs --disable-infobars --disable-session-crashed-bubble --password-store=basic "$KIOSK_URL" 9>&- &
+# Use dark browser chrome while Chromium is waiting for the kiosk page to paint.
+"$BROWSER" --kiosk --force-dark-mode --user-data-dir="$PROFILE_DIR" --no-first-run \
+  --noerrdialogs --disable-infobars --disable-session-crashed-bubble --password-store=basic "$KIOSK_URL" 9>&- &
 BROWSER_PID=$!
 trap 'kill -TERM "$BROWSER_PID" 2>/dev/null || true' TERM INT
 printf '%s\n' "$BROWSER_PID" > "$KIOSK_RUNTIME_DIR/browser.pid"

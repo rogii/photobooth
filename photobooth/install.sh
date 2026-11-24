@@ -17,13 +17,7 @@ sudo install -D -o root -g root -m 0644 "$APP_DIR/chromium-password-manager.json
 sudo apt install -y --no-install-recommends unclutter-xfixes
 
 if command -v labwc >/dev/null; then
-  CONFIGURE_CURSOR=false
-  read -r _ LABWC_VERSION _ <<< "$(labwc --version)"
-  if dpkg --compare-versions "$LABWC_VERSION" ge 0.8.4; then
-    sudo apt install -y --no-install-recommends swayidle wtype
-    CONFIGURE_CURSOR=true
-  fi
-  if ! python3 - "$CONFIGURE_CURSOR" <<'PY'
+  if ! python3 - <<'PY'
 import os
 import shutil
 import sys
@@ -36,23 +30,6 @@ config_dirs = (os.environ.get("XDG_CONFIG_DIRS") or "/etc/xdg").split(":")
 config = config_home / "labwc/rc.xml"
 system_configs = [Path(directory) / "labwc/rc.xml" for directory in config_dirs if directory]
 system_configs = [path for path in system_configs if path.is_file()]
-configure_cursor = sys.argv[1] == "true"
-shortcut = "A-W-h"
-marker = " Photobooth cursor shortcut "
-
-def bindings(document):
-    return [
-        node for node in document.getElementsByTagNameNS("*", "keybind")
-        if sorted(node.getAttribute("key").lower().split("-")) == ["a", "h", "w"]
-    ]
-
-def hides_cursor(binding):
-    actions = [node for node in binding.childNodes if node.nodeType == Node.ELEMENT_NODE]
-    return (
-        len(actions) == 1
-        and actions[0].localName == "action"
-        and actions[0].getAttribute("name").lower() == "hidecursor"
-    )
 
 if config.is_symlink():
     sys.exit(f"Labwc setup requires a regular configuration file at {config}.")
@@ -126,34 +103,7 @@ def enable_native_touch():
                 changed = True
     return changed
 
-def add_cursor_shortcut():
-    existing = bindings(document)
-    if any(not hides_cursor(binding) for binding in existing):
-        print(f"The {shortcut} shortcut is already in use in {source}.", file=sys.stderr)
-        return False
-    if not existing:
-        for path, system_root in zip(system_configs, system_roots):
-            if any(not hides_cursor(binding) for binding in bindings(system_root)):
-                print(f"The {shortcut} shortcut is already in use in {path}.", file=sys.stderr)
-                return False
-        keyboard = next(iter(elements(root, "keyboard")), None)
-        if keyboard is None:
-            keyboard = root.appendChild(new_element("keyboard"))
-        binding = keyboard.appendChild(new_element("keybind"))
-        binding.setAttribute("key", shortcut)
-        action = binding.appendChild(new_element("action"))
-        action.setAttribute("name", "HideCursor")
-    else:
-        binding = existing[0]
-
-    if not any(node.nodeType == Node.COMMENT_NODE and node.data == marker for node in binding.childNodes):
-        binding.insertBefore(document.createComment(marker), binding.firstChild)
-        return True
-    return source != config
-
-touch_changed = enable_native_touch()
-cursor_changed = configure_cursor and add_cursor_shortcut()
-if touch_changed or cursor_changed:
+if enable_native_touch():
     config.parent.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(dir=config.parent) as temp_dir:
         pending = Path(temp_dir) / config.name
@@ -164,7 +114,10 @@ if touch_changed or cursor_changed:
     print("Labwc configuration updated. Restart the desktop session to activate the changes.")
 PY
   then
-    echo "Labwc touchscreen and cursor configuration was skipped." >&2
+    echo "Labwc touchscreen configuration was skipped." >&2
+  fi
+  if ! python3 "$APP_DIR/configure-labwc-cursor.py"; then
+    echo "Labwc cursor configuration was skipped." >&2
   fi
 fi
 
@@ -269,6 +222,7 @@ python3 -m venv --system-site-packages "$APP_DIR/.venv"
 "$APP_DIR/.venv/bin/pip" install -r "$APP_DIR/requirements.txt"
 
 "$APP_DIR/install-service.sh"
+"$APP_DIR/boot-splash/install.sh"
 
 echo "Installation complete. Service: systemctl --user restart photobooth"
 echo "Kiosk: $APP_DIR/launch-kiosk.sh · Web address: http://127.0.0.1:8080"

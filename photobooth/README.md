@@ -30,7 +30,9 @@ The installer stops and masks the desktop user's `gvfs-gphoto2-volume-monitor.se
 
 The installer sets a machine-wide Chromium policy to disable password-saving prompts and password autofill on websites. Existing saved passwords stay in their profiles.
 
-On X11, the kiosk launcher uses `unclutter` to start with the pointer hidden and hide it again after one second of inactivity. On Wayland, the kiosk page hides the pointer within its own window. With labwc 0.8.4 or newer, the installer also configures the compositor to hide the pointer during kiosk use. Restart the desktop session to load the shortcut. The launcher stops the idle timer when the kiosk browser closes. The shortcut generates synthetic keyboard activity while the kiosk is idle, which can keep other desktop idle timers from firing.
+On labwc, the installer sets a transparent cursor theme for the desktop user. The pointer stays hidden during kiosk startup, inside Chromium, and on the desktop. Restart the desktop session to activate the theme. To restore the previous cursor, remove the `# Photobooth touchscreen cursor` comment and the following `XCURSOR_THEME=PhotoboothHidden` line from `~/.config/labwc/environment` and restart the session.
+
+On other Wayland desktops, the kiosk page hides the pointer within its own window. On X11, the kiosk launcher uses `unclutter` to hide the pointer at startup and after one second of inactivity.
 
 The kiosk is available locally on port 8080. The regular admin panel uses port 8081.
 
@@ -48,6 +50,22 @@ Chromium reconnects after the service restarts. Connect the camera via USB. Chec
 gphoto2 --auto-detect
 gphoto2 --capture-preview --filename /tmp/preview.jpg
 ```
+
+## Boot splash and kiosk startup
+
+On Raspberry Pi OS, `./install.sh` installs the Photo Booth Plymouth theme and enables the boot splash. Reboot to see the change. On Raspberry Pi OS Desktop with labwc and automatic desktop login, the same image stays behind Chromium as it starts. The wallpaper and panel start when you choose **Exit to desktop** or if the kiosk fails to start.
+
+If the system labwc autostart uses different commands to start the wallpaper and panel, the installer keeps that configuration and uses the regular desktop autostart.
+
+To restore the previous Plymouth theme, use the theme name recorded in `/etc/plymouth/photobooth-previous-theme`:
+
+```sh
+sudo plymouth-set-default-theme --rebuild-initrd "$(cat /etc/plymouth/photobooth-previous-theme)"
+```
+
+If no previous theme was recorded, choose one from `sudo plymouth-set-default-theme --list`. If the boot splash was previously disabled, you can turn it off again in Raspberry Pi Control Centre.
+
+To restore the regular desktop startup, restore `/etc/xdg/labwc/autostart.before-photobooth` to `/etc/xdg/labwc/autostart`, remove the `labwc/photobooth-kiosk` symlink from your user configuration directory, and reboot.
 
 ## Features
 

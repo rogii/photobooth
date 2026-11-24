@@ -1,0 +1,18 @@
+if (Plymouth.GetMode() == "boot")
+{
+    Window.SetBackgroundTopColor(0.031373, 0.043137, 0.050980);
+    Window.SetBackgroundBottomColor(0.031373, 0.043137, 0.050980);
+
+    image = Image("splash.png");
+    scale = Window.GetWidth() / image.GetWidth();
+    height_scale = Window.GetHeight() / image.GetHeight();
+    if (height_scale < scale)
+        scale = height_scale;
+    if (scale < 1)
+        image = image.Scale(image.GetWidth() * scale, image.GetHeight() * scale);
+
+    splash = Sprite(image);
+    splash.SetPosition(Window.GetX() + (Window.GetWidth() - image.GetWidth()) / 2,
+                       Window.GetY() + (Window.GetHeight() - image.GetHeight()) / 2,
+                       0);
+}
