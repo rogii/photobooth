@@ -5,9 +5,10 @@ The remote pairs with the photobooth's Raspberry Pi as a Bluetooth Low Energy (B
 ## Parts
 
 - Seeed Studio XIAO nRF52840 (standard model).
-- One protected, single-cell 3.7 V LiPo battery rated for the board's charge current.
+- One rechargeable 18650 lithium-ion cell rated for 4.2 V charging, with a matching holder. Choose a cell rated for the module's actual charge current. The Molicel M35A, for example, is rated for 1.7 A charging. [M35A datasheet](https://www.molicel.com/cn/wp-content/uploads/INR18650M35A_1.4_Product-Data-Sheet-of-INR-18650-M35A-80096.pdf)
+- One USB-C TP4056 charger module with cell protection and separate `B+`, `B−`, `OUT+`, and `OUT−` pads. The listed module is nominally 1 A. Confirm the pad labels on the board and check the programmed charge current against the cell's rating. [Module listing](https://www.amazon.se/dp/B0D9TSG6VB) · [TP4056 datasheet](https://toppwr.com/uploadfile/file/20240130/65b892bb04a3c.pdf)
 - Two WANGCL ELZ22579 arcade buttons (ASIN B09SKZNWDH) with normally open microswitch contacts and separate LED terminals, plus hookup wire. [Button reference](https://www.amazon.se/dp/B09SKZNWDH)
-- One Pololu U3V16F12 12 V boost module and one SPST switch (SW3) to disconnect its battery feed during charging. [Boost module pinout and load curves](https://www.pololu.com/product/4945)
+- One Pololu U3V16F12 12 V boost module and one SPST master power switch (SW3) rated for the combined battery current of the XIAO and boost circuit. [Boost module pinout and load curves](https://www.pololu.com/product/4945)
 - One TPS22918 load switch (U2), one 100 kΩ pull-down (R3), and one 2.2 µF ceramic input bypass capacitor (C1). [Load-switch datasheet](https://www.ti.com/lit/ds/symlink/tps22918.pdf)
 - Two AO3400A N-channel MOSFETs (Q1, Q2) and two 100 kΩ gate pull-down resistors (R1, R2). [MOSFET datasheet](https://www.aosmd.com/res/datasheets/AO3400A.pdf)
 - A USB-C data cable for programming and charging.
@@ -16,10 +17,12 @@ The remote pairs with the photobooth's Raspberry Pi as a Bluetooth Low Energy (B
 
 ```text
 Power
-  Protected LiPo (+) ----+---------- XIAO BAT+
-                         +-- SW3 --- U2 VIN (1)
-  Protected LiPo (-) ----+---------- XIAO BAT-
-                         +---------- GND
+  18650 (+) ------------------------ Charger B+
+  18650 (-) ------------------------ Charger B-
+  Charger OUT+ ---- SW3 ---+-------- XIAO BAT+
+                           +-------- U2 VIN (1)
+  Charger OUT- ------------+-------- XIAO BAT-
+                           +-------- GND
   U1 GND --------------------------- GND
   U1 VOUT -------------------------- +12V_LED
   U1 = Pololu U3V16F12
@@ -56,12 +59,18 @@ The boost module powers only the LED circuits. Leave the XIAO's USB 5 V and 3V3 
 
 A retailer listing for the exact ASIN specifies 12 V illumination. The schematic assumes a 12 V LED assembly with built-in current limiting. Confirm the rating, polarity and current limiting on the actual parts before wiring them to the boost rail. [Retailer specifications](https://www.desertcart.in/products/469788738-wangcl-10pcs-led-lit-arcade-push-buttons-with-micro-switch) If a button contains a bare LED, add a series resistor in its branch based on that LED's forward voltage and rated current.
 
-Check battery polarity against the board's underside pinout and use the dedicated battery pads. Open SW3 before USB-C charging to remove the LED and boost load from the cell. SW3 controls only the LED supply. Check that the selected charge current suits the cell before charging. [Seeed board pinout and charging documentation](https://wiki.seeedstudio.com/XIAO_BLE/)
+## Power and charging
+
+The TP4056 charges the cell to 4.2 V. The module's separate protection circuit provides backup overcharge, over-discharge, overcurrent, and short-circuit protection. Connect the cell only to `B+` and `B−` and use `OUT−` as the remote's ground. A ground connection to `B−` can bypass the module's discharge protection. [Protected module wiring diagram](https://www.handsontec.com/dataspecs/module/18650-Lithium%20charger.pdf) · [DW01A protection IC datasheet](https://www.ic-fortune.com/upload/Download/DW01A-DS-13_EN.pdf)
+
+The XIAO accepts 4.2 V from a fully charged cell on its underside `BAT+` and `BAT−` pads. Its onboard regulator supplies 3.3 V to the board. Verify the pad polarity before soldering. [Seeed board pinout](https://wiki.seeedstudio.com/XIAO_BLE/) · [Seeed power specifications](https://wiki.seeedstudio.com/xiao_nrf52840%26_wio_SX1262_kit_for_meshtastic/#specification)
+
+Open SW3 to shut off both the XIAO and the LED boost circuit. Charge through the TP4056 module's USB-C port with SW3 open. For programming, keep SW3 open and plug USB-C into the XIAO instead. USB powers the XIAO while SW3 disconnects its onboard charger from the cell. [Seeed schematic](https://files.seeedstudio.com/wiki/XIAO-BLE/Seeed_Studio_XIAO_nRF52840_PDF.pdf)
 
 ## Build and upload
 
 1. Add the [Seeed Boards Manager index](https://files.seeedstudio.com/arduino/package_seeeduino_boards_index.json) in Arduino IDE preferences. Install **Seeed nRF52 Boards** and select the board entry for the standard XIAO nRF52840.
-2. Open `remote/photobooth_remote/photobooth_remote.ino` and upload over USB-C. The sketch uses the Bluefruit library bundled with the board package. It starts on battery power without waiting for a serial monitor. [Seeed BLE keyboard example](https://wiki.seeedstudio.com/XIAO-BLE-Sense-Bluetooth_Usage/)
+2. With SW3 open, plug USB-C into the XIAO. Open `remote/photobooth_remote/photobooth_remote.ino` and upload. The sketch uses the Bluefruit library bundled with the board package. It starts on battery power without waiting for a serial monitor. [Seeed BLE keyboard example](https://wiki.seeedstudio.com/XIAO-BLE-Sense-Bluetooth_Usage/)
 
 The sketch compiles with Seeed nRF52 Boards 1.1.13. To build with Arduino CLI, run this from the repository root.
 
@@ -95,10 +104,11 @@ R3 holds the boost feed off during reset. Measure total battery current with bot
 
 ## Prototype checks
 
+- With SW3 open and USB-C connected only to the TP4056 module, confirm that the cell charges while the XIAO and button LEDs stay off.
 - With SW3 closed and USB-C unplugged, verify 12 V on `+12V_LED` with both LEDs on. Measure both LED branch currents and total battery current to check the load against the module's output curve and the cell's discharge rating.
 - Confirm both LEDs blink during advertising and pairing, glow steadily once the HID link is secure, and resume blinking when the Pi disconnects. Check that both return to steady on after reconnecting.
 - Leave the remote connected and idle, then verify that the first press of either button triggers its expected action once without reconnecting.
 - Leave the remote idle for 15 minutes. Confirm that both LEDs go out, the boost input loses battery power, and the kiosk displays the wake prompt. Check the same timeout with the Pi unavailable. Wake with each button in turn, including a held press, and verify that the prompt clears on reconnect and capture requires a fresh press.
 - Before selecting the remote in Photobooth Admin, verify that it pairs as a BLE keyboard and each button types its expected letter once, even when held down.
 - After selecting the remote in Photobooth Admin, verify single-photo and four-shot capture with an active session and the kiosk out of focus. Confirm that the remote's keys stay out of any focused text field.
-- Disconnect USB-C to verify battery operation, then reset the remote and confirm that it reconnects without pairing again or triggering a capture on reconnect.
+- Disconnect USB-C and close SW3 to verify battery operation, then reset the remote and confirm that it reconnects without pairing again or triggering a capture on reconnect.
