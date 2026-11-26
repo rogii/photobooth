@@ -1,6 +1,6 @@
 # Photobooth Remote
 
-The remote will pair with the photobooth's Raspberry Pi as a Bluetooth Low Energy (BLE) HID keyboard. One button will trigger a single photo and the other will trigger a four-shot sequence. This folder contains the hardware and firmware design. The Arduino sketch will live here once implemented.
+The remote pairs with the photobooth's Raspberry Pi as a Bluetooth Low Energy (BLE) HID keyboard. One button triggers a single photo and the other triggers a four-shot sequence. The Arduino sketch is in [photobooth_remote](photobooth_remote/photobooth_remote.ino).
 
 ## Parts
 
@@ -58,13 +58,20 @@ A retailer listing for the exact ASIN specifies 12 V illumination. The schematic
 
 Check battery polarity against the board's underside pinout and use the dedicated battery pads. Open SW3 before USB-C charging to remove the LED and boost load from the cell. SW3 controls only the LED supply. Check that the selected charge current suits the cell before charging. [Seeed board pinout and charging documentation](https://wiki.seeedstudio.com/XIAO_BLE/)
 
-## Arduino firmware plan
+## Build and upload
 
 1. Add the [Seeed Boards Manager index](https://files.seeedstudio.com/arduino/package_seeeduino_boards_index.json) in Arduino IDE preferences. Install **Seeed nRF52 Boards** and select the board entry for the standard XIAO nRF52840.
-2. Use the bundled Adafruit Bluefruit nRF52 library (`bluefruit.h`) and its `BLEHidAdafruit` service. Start with **File → Examples → Adafruit Bluefruit nRF52 Libraries → Peripheral → blehid_keyboard** to verify keyboard pairing over BLE. [Seeed BLE keyboard example](https://wiki.seeedstudio.com/XIAO-BLE-Sense-Bluetooth_Usage/)
-3. Advertise as **Photobooth Remote** and resume advertising on disconnect so a paired Pi can reconnect. The firmware should start on battery power without waiting for the USB serial monitor.
-4. Debounce each input independently. On a stable press while connected, send one unmodified key press followed by a key release. Require a physical release before sending another keystroke. Discard button presses made while disconnected.
-5. Initialize `D3` and `D4` as outputs driven `LOW`. Blink both LEDs together at 1 Hz (500 ms on, 500 ms off) while advertising or waiting for the HID link to become secure. Drive both outputs `HIGH` once the Pi has an active, secured BLE HID connection, including after a bonded reconnect. Resume blinking on disconnect. Use `millis()` for blink timing so the LEDs can update alongside input debouncing.
+2. Open `remote/photobooth_remote/photobooth_remote.ino` and upload over USB-C. The sketch uses the Bluefruit library bundled with the board package. It starts on battery power without waiting for a serial monitor. [Seeed BLE keyboard example](https://wiki.seeedstudio.com/XIAO-BLE-Sense-Bluetooth_Usage/)
+
+The sketch compiles with Seeed nRF52 Boards 1.1.13. To build with Arduino CLI, run this from the repository root.
+
+```sh
+arduino-cli compile --fqbn Seeeduino:nrf52:xiaonRF52840 remote/photobooth_remote
+```
+
+## Operation
+
+The device advertises as **Photobooth Remote** and resumes advertising after disconnects. Both button LEDs blink together at 1 Hz while advertising or waiting for a secure HID link. They stay lit once the link is encrypted and the host has enabled keyboard reports. Both buttons must be released before capture is armed after connecting. Each debounced press sends one unmodified key press and release. A held button sends a single keystroke, and presses made while disconnected are discarded.
 
 | Button | GPIO | Default key | Photobooth action |
 | --- | --- | --- | --- |
@@ -73,7 +80,7 @@ Check battery polarity against the board's underside pinout and use the dedicate
 
 Pair the remote through **Bluetooth remote** in the kiosk's PIN-protected local admin or in the network admin. The backend reads the selected device's HID key presses through Linux input. The table above is the remote mapping and applies independently of the configurable kiosk shortcuts, including when Chromium is out of focus. [Photobooth setup](../photobooth/README.md#bluetooth-capture-remote)
 
-For battery reporting, the firmware can expose an estimated percentage through Bluefruit's standard BLE Battery Service (`BLEBas`). The Pi can read the level through BlueZ's `org.bluez.Battery1` D-Bus interface if available for the connected device. [BlueZ Battery API](https://bluez.readthedocs.io/en/latest/battery-api/)
+Battery percentage reporting is optional future work. Bluefruit can expose an estimate through its standard BLE Battery Service (`BLEBas`), which BlueZ can expose through `org.bluez.Battery1`. [BlueZ Battery API](https://bluez.readthedocs.io/en/latest/battery-api/)
 
 ## Low-power operation
 
