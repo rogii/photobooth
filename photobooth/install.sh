@@ -11,6 +11,11 @@ USER_HOME="$HOME"
 
 sudo apt update
 sudo apt install -y python3 python3-venv python3-lgpio python3-gpiozero gphoto2 chromium bluez python3-evdev rfkill network-manager dnsmasq-base polkitd python3-dbus avahi-daemon
+sudo install -D -o root -g root -m 0644 "$APP_DIR/networkmanager-wifi.conf" \
+  /etc/NetworkManager/conf.d/90-photobooth-wifi-powersave.conf
+if systemctl is-active --quiet NetworkManager.service; then
+  sudo nmcli general reload conf
+fi
 sudo install -D -o root -g root -m 0644 "$APP_DIR/chromium-password-manager.json" \
   /etc/chromium/policies/managed/photobooth-password-manager.json
 # The kiosk launcher manages unclutter instead of using Debian's session-wide autostart.
