@@ -49,25 +49,23 @@ async function refreshPhotos() {
       photoGrid.append(empty);
     }
     data.photos.forEach((photo) => {
-      const card = document.createElement("article");
+      const card = document.createElement("button");
       card.className = "photo-card";
+      card.type = "button";
+      card.dataset.sessionId = photo.session_id;
+      card.dataset.relativePath = photo.relative_path;
+      card.setAttribute("aria-pressed", "false");
+      card.addEventListener("click", () => {
+        card.setAttribute("aria-pressed", String(card.getAttribute("aria-pressed") !== "true"));
+        updatePhotoActions();
+      });
       const urlPath = photo.relative_path.split("/").map(encodeURIComponent).join("/");
       const imageUrl = `${photoApi}/photo/${encodeURIComponent(photo.session_id)}/${urlPath}`;
       const image = document.createElement("img");
       image.src = imageUrl;
-      image.alt = `${photo.session_name}: ${photo.name}`;
+      image.alt = "";
       image.loading = "lazy";
-      const label = document.createElement("label");
-      const checkbox = document.createElement("input");
-      checkbox.type = "checkbox";
-      checkbox.dataset.sessionId = photo.session_id;
-      checkbox.dataset.relativePath = photo.relative_path;
-      checkbox.addEventListener("change", updatePhotoActions);
-      const selection = document.createElement("span");
-      selection.className = "photo-selection";
-      selection.append(checkbox, document.createTextNode("Select photo"));
-      label.append(image, selection);
-      const meta = document.createElement("div");
+      const meta = document.createElement("span");
       meta.className = "photo-meta";
       const name = document.createElement("span");
       name.className = "photo-name";
@@ -75,7 +73,7 @@ async function refreshPhotos() {
       const session = document.createElement("span");
       session.textContent = `${photo.session_name} · ${photo.relative_path}`;
       meta.append(name, session);
-      card.append(label, meta);
+      card.append(image, meta);
       photoGrid.append(card);
     });
     updatePhotoActions();
@@ -87,8 +85,8 @@ async function refreshPhotos() {
 }
 
 function updatePhotoActions() {
-  const photos = photoGrid.querySelectorAll("input[type=checkbox]");
-  const selected = photoGrid.querySelectorAll("input[type=checkbox]:checked").length;
+  const photos = photoGrid.querySelectorAll(".photo-card");
+  const selected = photoGrid.querySelectorAll('.photo-card[aria-pressed="true"]').length;
   togglePhotoSelection.disabled = movingPhotos || photos.length === 0;
   togglePhotoSelection.textContent = photos.length > 0 && selected === photos.length
     ? "Unselect all"
@@ -100,18 +98,19 @@ function updatePhotoActions() {
 $("#session-filter").addEventListener("change", refreshPhotos);
 $("#refresh").addEventListener("click", refreshPhotos);
 togglePhotoSelection.addEventListener("click", () => {
-  const photos = [...photoGrid.querySelectorAll("input[type=checkbox]")];
-  const selectAll = photos.some((input) => !input.checked);
-  photos.forEach((input) => { input.checked = selectAll; });
+  const selectAll = Boolean(photoGrid.querySelector('.photo-card[aria-pressed="false"]'));
+  photoGrid.querySelectorAll(".photo-card").forEach((card) => {
+    card.setAttribute("aria-pressed", String(selectAll));
+  });
   updatePhotoActions();
 });
 $("#delete-selected").addEventListener("click", async () => {
-  const selected = [...photoGrid.querySelectorAll("input[type=checkbox]:checked")];
+  const selected = [...photoGrid.querySelectorAll('.photo-card[aria-pressed="true"]')];
   if (movingPhotos || !selected.length) return;
   movingPhotos = true;
   updatePhotoActions();
   try {
-    const photos = selected.map((input) => ({ session_id: input.dataset.sessionId, relative_path: input.dataset.relativePath }));
+    const photos = selected.map((card) => ({ session_id: card.dataset.sessionId, relative_path: card.dataset.relativePath }));
     const result = await api(`${photoApi}/delete-photos`, { photos });
     say(`Moved ${result.moved} photo${result.moved === 1 ? "" : "s"} into Deleted. They remain in session ZIP downloads.`);
     await refreshPhotos();
