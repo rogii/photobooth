@@ -11,6 +11,24 @@ USER_HOME="$HOME"
 
 sudo apt update
 sudo apt install -y python3 python3-venv python3-lgpio python3-gpiozero gphoto2 chromium bluez python3-evdev rfkill network-manager dnsmasq-base polkitd python3-dbus avahi-daemon
+event_font_packages=(fonts-cantarell fonts-comfortaa fonts-ebgaramond fonts-lato fonts-roboto-slab)
+sudo apt install -y --no-install-recommends "${event_font_packages[@]}"
+
+# Serve the same fonts to the kiosk and remote admin, even on an offline network.
+event_font_dir="$APP_DIR/static/event-fonts"
+cantarell="/usr/share/fonts/opentype/cantarell/Cantarell-VF.otf"
+if [[ ! -f "$cantarell" ]]; then
+  cantarell="/usr/share/fonts/opentype/cantarell/Cantarell-Bold.otf"
+fi
+install -D -m 0644 "$cantarell" "$event_font_dir/Cantarell.otf"
+install -D -m 0644 /usr/share/fonts/truetype/comfortaa/Comfortaa-Bold.ttf "$event_font_dir/Comfortaa-Bold.ttf"
+install -D -m 0644 /usr/share/fonts/opentype/ebgaramond/EBGaramond12-Bold.otf "$event_font_dir/EBGaramond12-Bold.otf"
+install -D -m 0644 /usr/share/fonts/truetype/lato/Lato-Bold.ttf "$event_font_dir/Lato-Bold.ttf"
+install -D -m 0644 /usr/share/fonts/opentype/roboto/slab/RobotoSlab-Bold.otf "$event_font_dir/RobotoSlab-Bold.otf"
+for package in "${event_font_packages[@]}"; do
+  install -m 0644 "/usr/share/doc/$package/copyright" "$event_font_dir/$package-license.txt"
+done
+
 sudo install -D -o root -g root -m 0644 "$APP_DIR/networkmanager-wifi.conf" \
   /etc/NetworkManager/conf.d/90-photobooth-wifi-powersave.conf
 if systemctl is-active --quiet NetworkManager.service; then

@@ -1,0 +1,24 @@
+.layout-options {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr));
+  gap: 16px;
+  margin: 0;
+  border: 0;
+  padding: 0;
+}
+.layout-options legend { padding: 0 0 12px; font-weight: 650; }
+.layout-option {
+  display: block;
+  overflow: hidden;
+  border: 2px solid var(--line);
+  border-radius: 8px;
+  background: var(--card);
+  cursor: pointer;
+}
+.layout-option:has(:checked) { border-color: var(--accent); }
+.layout-option:focus-within { outline: 2px solid currentColor; outline-offset: 2px; }
+.layout-option img { display: block; width: 100%; aspect-ratio: 3 / 2; object-fit: contain; background: var(--canvas); }
+.layout-option span { display: flex; gap: 8px; align-items: center; padding: 10px; }
+.layout-option input { accent-color: var(--accent); }
+.font-picker { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin: 20px 0; }
+#sample { overflow-wrap: anywhere; font-size: 24px; }

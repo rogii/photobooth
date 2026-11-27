@@ -1,0 +1,43 @@
+[data-font="system"] .event-name { font-family: system-ui, sans-serif; }
+[data-font="serif"] .event-name { font-family: Georgia, "DejaVu Serif", serif; }
+[data-font="mono"] .event-name { font-family: "DejaVu Sans Mono", monospace; }
+
+@font-face {
+  font-family: "Cantarell";
+  src: url("event-fonts/Cantarell.otf");
+  font-weight: 700;
+  font-display: swap;
+}
+[data-font="cantarell"] .event-name { font-family: "Cantarell", sans-serif; }
+
+@font-face {
+  font-family: "Comfortaa";
+  src: url("event-fonts/Comfortaa-Bold.ttf");
+  font-weight: 700;
+  font-display: swap;
+}
+[data-font="comfortaa"] .event-name { font-family: "Comfortaa", sans-serif; }
+
+@font-face {
+  font-family: "EB Garamond";
+  src: url("event-fonts/EBGaramond12-Bold.otf");
+  font-weight: 700;
+  font-display: swap;
+}
+[data-font="eb-garamond"] .event-name { font-family: "EB Garamond", serif; }
+
+@font-face {
+  font-family: "Lato";
+  src: url("event-fonts/Lato-Bold.ttf");
+  font-weight: 700;
+  font-display: swap;
+}
+[data-font="lato"] .event-name { font-family: "Lato", sans-serif; }
+
+@font-face {
+  font-family: "Roboto Slab";
+  src: url("event-fonts/RobotoSlab-Bold.otf");
+  font-weight: 700;
+  font-display: swap;
+}
+[data-font="roboto-slab"] .event-name { font-family: "Roboto Slab", serif; }

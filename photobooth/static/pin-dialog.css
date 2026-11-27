@@ -1,4 +1,4 @@
-.admin-pin-overlay{position:fixed;inset:0;z-index:40;display:grid;place-items:center;padding:20px;background:color-mix(in srgb, var(--scrim) 94%, transparent)}
+.admin-pin-overlay{position:fixed;inset:0;z-index:40;display:grid;place-items:center;padding:20px}
 .admin-pin-card{width:min(420px,100%);padding:28px;border:1px solid var(--line);border-radius:14px;background:var(--panel);box-shadow:0 25px 90px #000b;color:var(--text);max-height:calc(100dvh - 40px);overflow:auto}
 .admin-pin-card h1{margin:8px 0;font-size:clamp(26px,5vw,36px)}
 .admin-pin-card p{margin:0 0 18px;color:var(--text-muted)}
@@ -11,7 +11,11 @@
 .admin-pin-actions button:focus-visible,.admin-pin-card input:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 .admin-pin-error{min-height:20px;margin-top:8px;color:#ffb8a6;font-size:13px}
 
-dialog.admin-pin-card::backdrop{background:color-mix(in srgb, var(--scrim) 94%, transparent)}
+.admin-pin-overlay,
+dialog.admin-pin-card::backdrop {
+  background: color-mix(in srgb, var(--scrim) 78%, transparent);
+  backdrop-filter: blur(8px);
+}
 .admin-pin-pad [data-digit="0"]{grid-column:2}
 .admin-pin-pad button:disabled,.admin-pin-actions button:disabled{opacity:.5}
 

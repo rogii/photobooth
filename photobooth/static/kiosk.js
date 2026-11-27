@@ -12,6 +12,7 @@ let gallerySession = null;
 let photoWallPhotos = [];
 let photoWallRequest = false;
 let galleryLayout = "";
+const maxHistoryPhotos = 11;
 let pickerOpen = false;
 let capsLock = false;
 let adminHoldTimer = null;
@@ -79,8 +80,9 @@ function render(current) {
   const queuedUploads = Number(current.queued_uploads || 0);
   const galleryUploadConfigured = !!current.gallery_upload_configured;
   $("#upload-indicator").classList.toggle("pending", queuedUploads > 0);
+  const uploadOffLabel = current.capture_layout === "event-sidebar" ? "UPLOAD" : "GALLERY UPLOAD OFF";
   $("#upload-status").textContent = !galleryUploadConfigured
-    ? "GALLERY UPLOAD OFF"
+    ? uploadOffLabel
     : queuedUploads > 0 ? "GALLERY UPLOADS PENDING" : "GALLERY UP TO DATE";
   $("#upload-count").textContent = queuedUploads > 0 ? `${queuedUploads} queued` : "";
   const selfieStatus = current.selfie_button_status;
@@ -88,6 +90,7 @@ function render(current) {
     !cameraFailed && current.selfie_button_configured && selfieStatus !== "connected";
   $("#selfie-wake-prompt").classList.toggle("hidden", !showSelfieWakePrompt);
   $("#selfie-stat").classList.toggle("hidden", !selfieStatus);
+  $("#selfie-stat").toggleAttribute("data-connected", selfieStatus === "connected");
   $("#selfie-divider").classList.toggle("hidden", !selfieStatus);
   const selfieLabel = selfieStatus ? selfieStatus.toUpperCase() : "";
   if ($("#selfie-status").textContent !== selfieLabel) $("#selfie-status").textContent = selfieLabel;
@@ -96,7 +99,8 @@ function render(current) {
   $("#picker-hotspot").classList.toggle("hidden", !hotspot);
   $("#picker-hotspot").textContent = hotspot ? `Hotspot active · ${hotspot.ssid} · ${hotspot.ip}:8081` : "";
   $("#internet-status").textContent = hotspot ? "HOTSPOT ACTIVE" : online ? "ONLINE" : "OFFLINE";
-  $("#network-detail").textContent = hotspot ? hotspot.ssid : "INTERNET";
+  const networkLabel = current.capture_layout === "event-sidebar" ? "" : "INTERNET";
+  $("#network-detail").textContent = hotspot ? hotspot.ssid : networkLabel;
   $("#internet-indicator").classList.toggle("offline", !hotspot && !online);
 
   if (gallerySession !== current.session?.id) {
@@ -113,6 +117,7 @@ function render(current) {
   const loadingResult = current.phase === "result" &&
     (photoWallVersion !== current.photo_wall_version || (lead && !lead.complete));
   $("#overlay").classList.toggle("hidden", !capturing && !loadingResult);
+  $(".capture-trigger").classList.toggle("capture-trigger-busy", current.busy || capturing || loadingResult);
   const downloading = current.status === "Downloading four photos";
   const detail = $("#capture-detail");
   const preparingCollage = current.status === "Preparing collage" ||
@@ -247,15 +252,45 @@ function setConnectionStatus(isConnected) {
 }
 
 
+function contactSheetRows(wall) {
+  const latest = photoWallPhotos[0];
+  const image = latest && wall.querySelector(`img[data-url="${CSS.escape(latest.url)}"]`);
+  if (!image?.naturalWidth || !wall.clientHeight) return 2;
+
+  const style = getComputedStyle(wall);
+  const gap = parseFloat(style.gap);
+  const width = wall.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight);
+  const height = wall.clientHeight - parseFloat(style.paddingTop) - parseFloat(style.paddingBottom);
+  // Each history column gets one quarter of the grid width after both column gaps.
+  const thumbnailHeight = (width - 2 * gap) / 4 * image.naturalHeight / image.naturalWidth;
+  return Math.max(1, Math.min(Math.floor(maxHistoryPhotos / 2), Math.floor(
+    (height + gap) / (thumbnailHeight + gap)
+  )));
+}
+
 function renderPhotoWall() {
   const wall = $("#photo-wall");
-  const slots = Number(state.photo_wall_columns) || 3;
+  const name = state.capture_layout || "side-gallery";
+  const screen = $("#screen");
+  if (screen.dataset.layout !== name) screen.dataset.layout = name;
+  if (screen.dataset.font !== state.event_font) screen.dataset.font = state.event_font || "system";
+  const capacities = { filmstrip: 4, spotlight: 2, "print-table": 2 };
+  let slots = capacities[name] || Number(state.photo_wall_columns) || 3;
+  if (name === "event-sidebar") {
+    const gap = parseFloat(getComputedStyle(wall).columnGap);
+    // The history row has one quarter of the grid height after the gap.
+    const thumbnailWidth = (wall.clientHeight - gap) / 4 * 1.5;
+    slots = Math.max(1, Math.min(maxHistoryPhotos, Math.round(
+      (wall.clientWidth + gap) / (thumbnailWidth + gap)
+    )));
+  }
+  if (name === "contact-sheet") slots = 2 * contactSheetRows(wall);
   const capturing = state.phase === "countdown" || state.phase === "capturing";
   // Keep the old lead in the rail until the saved result arrives.
   const awaitingResult = state.phase === "result" && photoWallVersion !== state.photo_wall_version;
   const reserveLead = capturing || awaitingResult;
   const photos = photoWallPhotos.slice(0, slots + (reserveLead ? 0 : 1));
-  const layout = JSON.stringify([slots, reserveLead, photos.map(photo => photo.url)]);
+  const layout = JSON.stringify([name, slots, reserveLead, photos.map(photo => photo.url)]);
   $("#first-capture").classList.toggle("hidden", reserveLead || photos.length > 0 || !photoWallVersion);
   if (layout === galleryLayout) return;
   galleryLayout = layout;
@@ -264,6 +299,7 @@ function renderPhotoWall() {
   const oldLead = wall.querySelector(".lead-photo");
   const before = oldLead?.getBoundingClientRect();
   wall.style.setProperty("--history-slots", slots);
+  if (name === "contact-sheet") wall.style.setProperty("--contact-sheet-rows", slots / 2);
   photos.forEach((photo, index) => {
     const lead = !reserveLead && index === 0;
     const image = existing.get(photo.url) || new Image();
@@ -273,9 +309,16 @@ function renderPhotoWall() {
       wall.append(image);
     }
     existing.delete(photo.url);
+    if (lead) image.getAnimations().forEach(animation => animation.cancel());
     image.className = lead ? "lead-photo" : "history-photo";
-    image.style.gridRow = lead ? "1 / -1" : String(reserveLead ? index + 1 : index);
-    image.alt = lead ? "Latest capture" : `Previous capture ${image.style.gridRow}`;
+    const position = reserveLead ? index + 1 : index;
+    image.style.setProperty("--position", position);
+    image.dataset.position = position;
+    if (name === "contact-sheet" && !lead) {
+      image.style.setProperty("--contact-sheet-row", Math.ceil(position / 2));
+      image.style.setProperty("--contact-sheet-column", position % 2 ? 2 : 3);
+    }
+    image.alt = lead ? "Latest capture" : `Previous capture ${position}`;
   });
   for (const image of existing.values()) image.remove();
   if (capturing && oldLead?.isConnected && !matchMedia("(prefers-reduced-motion: reduce)").matches) {
@@ -283,7 +326,7 @@ function renderPhotoWall() {
     if (after.width && after.height) {
       oldLead.animate([
         { transform: `translate(${before.x - after.x}px, ${before.y - after.y}px) scale(${before.width / after.width}, ${before.height / after.height})` },
-        { transform: "none" },
+        { transform: getComputedStyle(oldLead).transform },
       ], { duration: 300, easing: "ease-out" });
     }
   }
@@ -294,7 +337,9 @@ async function updatePhotoWall() {
   if (!state?.session || !version || version === photoWallVersion || photoWallRequest) return;
   photoWallRequest = true;
   try {
-    const data = await api("/api/photo-wall?rows=2");
+    const columns = Number(state.photo_wall_columns) || 3;
+    const rows = Math.max(2, Math.ceil((maxHistoryPhotos + 1) / columns));
+    const data = await api(`/api/photo-wall?rows=${rows}`);
     if (state.photo_wall_version === version) {
       photoWallPhotos = data.photos || [];
       photoWallVersion = version;
@@ -347,6 +392,11 @@ document.addEventListener("keydown", (event) => {
 
 refresh();
 renderKeyboard();
+$("#photo-wall").addEventListener("load", (event) => {
+  if (state?.capture_layout === "contact-sheet" && event.target.dataset.url === photoWallPhotos[0]?.url) {
+    renderPhotoWall();
+  }
+}, true);
 $("#session-input").addEventListener("input", syncPickerName);
 $("#start-new-session").addEventListener("click", openNewSessionForm);
 $("#back-to-sessions").addEventListener("click", returnToSessionOptions);
