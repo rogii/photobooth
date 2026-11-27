@@ -19,29 +19,34 @@ function say(message, isError = false) {
 }
 
 const photoApi = $("[data-photo-api]").dataset.photoApi;
+const photoGrid = $("#photo-grid");
+const togglePhotoSelection = $("#toggle-photo-selection");
 
 let movingPhotos = false;
+let photoRequestId = 0;
 
 async function refreshPhotos() {
+  const requestId = ++photoRequestId;
+  photoGrid.replaceChildren();
+  updatePhotoActions();
   $("#photo-summary").textContent = "Loading photos…";
   try {
     const sessionId = $("#session-filter").value;
     const query = sessionId ? `?session_id=${encodeURIComponent(sessionId)}` : "";
     const data = await api(`${photoApi}/photos${query}`);
+    if (requestId !== photoRequestId) return;
     const filter = $("#session-filter");
     const selected = filter.value;
     filter.replaceChildren(new Option("All sessions", ""));
     data.sessions.forEach((item) => filter.add(new Option(item.name, item.id)));
     filter.value = data.sessions.some((item) => item.id === selected) ? selected : "";
 
-    const grid = $("#photo-grid");
-    grid.replaceChildren();
     $("#photo-summary").textContent = `${data.photos.length} photo${data.photos.length === 1 ? "" : "s"}`;
     if (!data.photos.length) {
       const empty = document.createElement("div");
       empty.className = "empty";
       empty.textContent = "No photos found for this selection.";
-      grid.append(empty);
+      photoGrid.append(empty);
     }
     data.photos.forEach((photo) => {
       const card = document.createElement("article");
@@ -57,8 +62,11 @@ async function refreshPhotos() {
       checkbox.type = "checkbox";
       checkbox.dataset.sessionId = photo.session_id;
       checkbox.dataset.relativePath = photo.relative_path;
-      checkbox.addEventListener("change", updateDeleteButton);
-      label.append(checkbox, document.createTextNode("Select photo"));
+      checkbox.addEventListener("change", updatePhotoActions);
+      const selection = document.createElement("span");
+      selection.className = "photo-selection";
+      selection.append(checkbox, document.createTextNode("Select photo"));
+      label.append(image, selection);
       const meta = document.createElement("div");
       meta.className = "photo-meta";
       const name = document.createElement("span");
@@ -67,29 +75,41 @@ async function refreshPhotos() {
       const session = document.createElement("span");
       session.textContent = `${photo.session_name} · ${photo.relative_path}`;
       meta.append(name, session);
-      card.append(image, label, meta);
-      grid.append(card);
+      card.append(label, meta);
+      photoGrid.append(card);
     });
-    updateDeleteButton();
+    updatePhotoActions();
   } catch (error) {
+    if (requestId !== photoRequestId) return;
     $("#photo-summary").textContent = error.message;
     say(error.message, true);
   }
 }
 
-function updateDeleteButton() {
-  const selected = $("#photo-grid").querySelectorAll("input[type=checkbox]:checked").length;
+function updatePhotoActions() {
+  const photos = photoGrid.querySelectorAll("input[type=checkbox]");
+  const selected = photoGrid.querySelectorAll("input[type=checkbox]:checked").length;
+  togglePhotoSelection.disabled = movingPhotos || photos.length === 0;
+  togglePhotoSelection.textContent = photos.length > 0 && selected === photos.length
+    ? "Unselect all"
+    : "Select all";
   $("#delete-selected").disabled = movingPhotos || selected === 0;
   $("#delete-selected").textContent = selected ? `Move ${selected} selected to Deleted` : "Move selected to Deleted";
 }
 
 $("#session-filter").addEventListener("change", refreshPhotos);
 $("#refresh").addEventListener("click", refreshPhotos);
+togglePhotoSelection.addEventListener("click", () => {
+  const photos = [...photoGrid.querySelectorAll("input[type=checkbox]")];
+  const selectAll = photos.some((input) => !input.checked);
+  photos.forEach((input) => { input.checked = selectAll; });
+  updatePhotoActions();
+});
 $("#delete-selected").addEventListener("click", async () => {
-  const selected = [...$("#photo-grid").querySelectorAll("input[type=checkbox]:checked")];
+  const selected = [...photoGrid.querySelectorAll("input[type=checkbox]:checked")];
   if (movingPhotos || !selected.length) return;
   movingPhotos = true;
-  updateDeleteButton();
+  updatePhotoActions();
   try {
     const photos = selected.map((input) => ({ session_id: input.dataset.sessionId, relative_path: input.dataset.relativePath }));
     const result = await api(`${photoApi}/delete-photos`, { photos });
@@ -99,7 +119,7 @@ $("#delete-selected").addEventListener("click", async () => {
     say(error.message, true);
   } finally {
     movingPhotos = false;
-    updateDeleteButton();
+    updatePhotoActions();
   }
 });
 
