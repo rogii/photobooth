@@ -28,9 +28,9 @@
         <a class="button secondary" href="{{ url_for('local_admin_wifi_page') }}">Wi-Fi setup</a>
         <button class="button secondary" type="button" aria-haspopup="dialog" aria-controls="selfie-panel" data-open-bluetooth-remote>Bluetooth remote</button>
         <button id="change-pin" class="button secondary" type="button">Change admin PIN</button>
-        <button id="exit-kiosk" class="button secondary" type="button">Exit to desktop</button>
-        <button id="reboot" class="button danger" type="button">Restart Raspberry Pi</button>
-        <button id="shutdown" class="button danger" type="button">Shut down Raspberry Pi</button>
+        <button id="exit-kiosk" class="button secondary" type="button" aria-haspopup="dialog">Exit to desktop</button>
+        <button id="reboot" class="button danger" type="button" aria-haspopup="dialog">Restart Raspberry Pi</button>
+        <button id="shutdown" class="button danger" type="button" aria-haspopup="dialog">Shut down Raspberry Pi</button>
         {% else %}
         <a class="button secondary" href="{{ url_for('admin') }}">Back to admin</a>
         {% endif %}
@@ -56,6 +56,14 @@
     <div id="message" role="status" aria-live="polite"></div>
   </main>
   {% if local %}
+  <dialog id="system-confirmation" class="card system-confirmation" aria-labelledby="system-confirmation-title" aria-describedby="system-confirmation-description">
+    <h2 id="system-confirmation-title"></h2>
+    <p id="system-confirmation-description"></p>
+    <form method="dialog">
+      <button class="secondary" value="cancel" autofocus>Cancel</button>
+      <button id="confirm-system-action" value="confirm"></button>
+    </form>
+  </dialog>
   <dialog id="selfie-panel" class="card bluetooth-remote-dialog" aria-labelledby="selfie-panel-heading" data-bluetooth-api="{{ url_for('local_admin_bluetooth_remote') }}">
     <header class="topbar">
       <h2 id="selfie-panel-heading">Bluetooth remote</h2>

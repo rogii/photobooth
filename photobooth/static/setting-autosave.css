@@ -1,0 +1,30 @@
+.autosave-field {
+  flex: 1;
+  min-width: min(100%, 180px);
+}
+
+.save-feedback {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-muted);
+  font-size: .875rem;
+}
+
+.save-feedback:has([data-state]:not([data-state=""])) {
+  margin-top: 6px;
+}
+
+.save-feedback[data-state="saved"],
+.save-feedback [data-state="saved"] {
+  color: #86db99;
+}
+
+.save-feedback[data-state="error"],
+.save-feedback [data-state="error"] {
+  color: #ffb8a6;
+}
+
+.save-feedback button {
+  padding: 5px 9px;
+}

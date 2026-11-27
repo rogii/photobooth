@@ -1,13 +1,23 @@
 *{box-sizing:border-box}body{margin:0;background:var(--page);color:var(--text);font:16px system-ui,sans-serif}.wrap{max-width:1180px;margin:32px auto;padding:0 20px 40px}.topbar,.photo-heading{display:flex;align-items:center;justify-content:space-between;gap:20px}.topbar{margin-bottom:22px}.eyebrow{color:var(--accent);font-size:10px;font-weight:800;letter-spacing:.2em}.topbar h1{margin:5px 0;font-size:clamp(28px,5vw,42px);letter-spacing:-.04em}.topbar p,.muted{color:var(--text-muted)}.topbar p{margin:0}.top-actions,.photo-actions{display:flex;align-items:center;gap:9px;flex-wrap:wrap}.button,button,select,input{border:1px solid var(--line);border-radius:6px;padding:10px 13px;font:inherit}.button,button{background:var(--accent);color:var(--accent-ink);font-weight:750;cursor:pointer;text-decoration:none}.button.secondary,button.secondary{background:var(--secondary);color:var(--text)}.button.danger,button.danger{background:#74453e;color:#fff}.button:disabled,button:disabled{cursor:not-allowed;opacity:.5}.card{padding:20px;margin:16px 0;border:1px solid var(--secondary-strong);border-radius:10px;background:var(--card)}.card h2{margin:0 0 5px;color:var(--accent);font-size:19px}.card p{margin:0}select{background:var(--field);color:var(--text)}.photo-heading{align-items:flex-end;margin-bottom:16px}.photo-heading .muted{margin-top:5px}.photo-actions select{min-width:180px}.photo-actions button{font-size:13px}.photo-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(185px,1fr));gap:12px}.photo-card{min-width:0;overflow:hidden;border:1px solid var(--secondary-strong);border-radius:7px;background:var(--page)}.photo-card label{display:flex;align-items:center;gap:8px;padding:8px;color:var(--text-secondary);font-size:12px}.photo-card input{accent-color:var(--accent);width:17px;height:17px}.photo-card img{display:block;width:100%;height:132px;object-fit:cover;background:var(--canvas)}.photo-card .photo-meta{padding:0 9px 10px;color:var(--text-muted);font-size:11px;overflow-wrap:anywhere}.photo-card .photo-name{display:block;margin-bottom:3px;color:var(--text);font-weight:700}.empty{padding:28px 12px;border:1px dashed var(--line);border-radius:7px;color:var(--text-muted);text-align:center;grid-column:1/-1}#message{min-height:26px;color:var(--accent)}.error{color:#ffb8a6!important}@media(max-width:700px){.topbar,.photo-heading{align-items:stretch;flex-direction:column}.top-actions>*{flex:1;text-align:center}.photo-actions>*{flex:1}.photo-actions select{min-width:0}}
 
-.bluetooth-remote-dialog {
+.bluetooth-remote-dialog,
+.system-confirmation {
   width: min(520px, calc(100% - 32px));
   margin: auto;
   color: var(--text);
 }
 
-.bluetooth-remote-dialog::backdrop {
+.bluetooth-remote-dialog::backdrop,
+.system-confirmation::backdrop {
   background: rgb(0 0 0 / 65%);
+}
+
+.system-confirmation form {
+  display: flex;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 16px;
 }
 
 .bluetooth-remote-dialog .topbar {

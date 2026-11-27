@@ -150,35 +150,41 @@ if ($("#kiosk-link")) {
   });
   pinDialog.addEventListener("close", () => { newPin = ""; });
 
-  $("#exit-kiosk").addEventListener("click", async () => {
-    if (!confirm("Close the kiosk browser and return to the desktop?")) return;
-    const button = $("#exit-kiosk");
-    button.disabled = true;
+  const systemActions = [
+    { id: "exit-kiosk", label: "Exit to desktop", description: "The kiosk browser will close and the photobooth service will keep running.", message: "Closing the kiosk browser…" },
+    { id: "reboot", label: "Restart", description: "The photobooth will be unavailable while the Raspberry Pi restarts.", message: "Raspberry Pi is restarting…" },
+    { id: "shutdown", label: "Shut down", description: "The photobooth will be unavailable until the Raspberry Pi is powered on again.", message: "Raspberry Pi is shutting down…" },
+  ];
+  const confirmation = $("#system-confirmation");
+  const confirmButton = $("#confirm-system-action");
+  const systemButtons = systemActions.map(({ id }) => document.getElementById(id));
+  let selectedAction;
+
+  systemActions.forEach((action, index) => {
+    const button = systemButtons[index];
+    button.addEventListener("click", () => {
+      selectedAction = action;
+      $("#system-confirmation-title").textContent = `${button.textContent}?`;
+      $("#system-confirmation-description").textContent = action.description;
+      confirmButton.textContent = action.label;
+      confirmButton.classList.toggle("danger", button.classList.contains("danger"));
+      confirmation.showModal();
+    });
+  });
+  confirmation.querySelector("form").addEventListener("submit", async (event) => {
+    if (event.submitter !== confirmButton) return;
+    event.preventDefault();
+    const { id, message } = selectedAction;
+    confirmation.close();
+    systemButtons.forEach((button) => { button.disabled = true; });
+    say(message);
     try {
-      await api("/api/local-admin/exit-kiosk", {});
+      await api(`/api/local-admin/${id}`, {});
     } catch (error) {
       say(error.message, true);
-      button.disabled = false;
+      systemButtons.forEach((button) => { button.disabled = false; });
     }
   });
-
-  const powerActions = [
-    ["reboot", "Restart the Raspberry Pi now? The photobooth will be unavailable while it restarts.", "Raspberry Pi is restarting…"],
-    ["shutdown", "Shut down the Raspberry Pi now? The photobooth will be unavailable until it is powered on again.", "Raspberry Pi is shutting down…"],
-  ];
-  for (const [action, prompt, message] of powerActions) {
-    $(`#${action}`).addEventListener("click", async () => {
-      if (!confirm(prompt)) return;
-      for (const [id] of powerActions) $(`#${id}`).disabled = true;
-      try {
-        await api(`/api/local-admin/${action}`, {});
-        say(message);
-      } catch (error) {
-        say(error.message, true);
-        for (const [id] of powerActions) $(`#${id}`).disabled = false;
-      }
-    });
-  }
 }
 
 refreshPhotos();

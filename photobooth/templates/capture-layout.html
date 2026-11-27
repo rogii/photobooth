@@ -8,15 +8,18 @@
   <link rel="stylesheet" href="/static/local-admin.css">
   <link rel="stylesheet" href="/static/event-fonts.css">
   <link rel="stylesheet" href="/static/layout-picker.css">
+  <link rel="stylesheet" href="/static/setting-autosave.css">
   <script src="/static/appearance.js" defer></script>
+  <script src="/static/setting-autosave.js" defer></script>
+  <script src="/static/layout-picker.js" defer></script>
 </head>
 <body>
   <main class="wrap">
     <header class="topbar">
       <h1>Capture layout</h1>
-      <a class="button secondary" href="{{ '/local-admin' if local else '/admin' }}">Back to admin</a>
+      <a id="back-to-admin" class="button secondary" href="{{ '/local-admin' if local else '/admin' }}">Back to admin</a>
     </header>
-    <form method="post">
+    <form id="layout-form" method="post" action="{{ request.path }}">
       <input type="hidden" name="token" value="{{ session.layout_token }}">
       <fieldset class="layout-options">
         <legend>Choose a layout</legend>
@@ -27,6 +30,7 @@
         </label>
         {% endfor %}
       </fieldset>
+      <div data-save-status="capture_layout"></div>
       <div class="font-picker">
         <label for="event-font">Event name font</label>
         <select id="event-font" name="event_font">
@@ -34,16 +38,12 @@
           <option value="{{ key }}" {% if config.event_font == key %}selected{% endif %}>{{ name }}</option>
           {% endfor %}
         </select>
+        <div data-save-status="event_font"></div>
         <strong id="sample" data-font="{{ config.event_font }}"><span class="event-name">{{ event_name }}</span></strong>
       </div>
-      <button>Save changes</button>
-      <span role="status">{{ error or ('Changes saved.' if saved else '') }}</span>
+      <noscript><button>Save changes</button></noscript>
+      {% if error or saved %}<span role="status">{{ error or 'Changes saved.' }}</span>{% endif %}
     </form>
   </main>
-  <script>
-    document.querySelector("#event-font").addEventListener("change", event => {
-      document.querySelector("#sample").dataset.font = event.target.value;
-    });
-  </script>
 </body>
 </html>

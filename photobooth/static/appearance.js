@@ -13,17 +13,12 @@
         root.style.setProperty("--accent", colors[color]);
         root.toggleAttribute("data-accent-tinted", color !== "green");
       }
-      if (selector) {
-        if (selector.disabled) {
-          for (const name of Object.keys(colors)) {
-            selector.add(new Option(name[0].toUpperCase() + name.slice(1), name));
-          }
-          selector.value = color;
-          selector.disabled = false;
-          selector.form.querySelector("button").disabled = false;
-        } else if (selector.value === savedColor) {
-          selector.value = color;
+      if (selector && selector.disabled) {
+        for (const name of Object.keys(colors)) {
+          selector.add(new Option(name[0].toUpperCase() + name.slice(1), name));
         }
+        selector.value = color;
+        selector.disabled = false;
       }
       savedColor = color;
     } catch {

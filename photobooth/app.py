@@ -1543,13 +1543,25 @@ def create_app(service, admin_port=ADMIN_PORT):
     def capture_layout_page():
         error = ""
         if request.method == "POST":
-            if request.form.get("token") != session.get("layout_token") or "layout_token" not in session:
-                return "Reopen the layout picker and try again.", 403
+            payload = request.get_json(silent=True) if request.is_json else request.form
+            if request.is_json and not isinstance(payload, dict):
+                return jsonify({"error": "Expected a settings object."}), 400
+            if "layout_token" not in session or payload.get("token") != session["layout_token"]:
+                error = "Reopen the layout picker and try again."
+                return (jsonify({"error": error}) if request.is_json else error), 403
+            keys = ("capture_layout", "event_font")
+            values = {key: payload.get(key) for key in keys if not request.is_json or key in payload}
             try:
-                service.update_config({key: request.form.get(key) for key in ("capture_layout", "event_font")})
+                if not values:
+                    raise ValueError("Choose a layout or event font.")
+                service.update_config(values)
+                if request.is_json:
+                    return jsonify({"saved": True})
                 return redirect(request.path + "?saved=1", code=303)
             except (ValueError, RuntimeError) as exc:
                 error = str(exc)
+                if request.is_json:
+                    return jsonify({"error": error}), 400
         if "layout_token" not in session:
             session["layout_token"] = uuid.uuid4().hex
         return render_template(
@@ -1563,12 +1575,13 @@ def create_app(service, admin_port=ADMIN_PORT):
     def admin_photos_page():
         return render_template("admin-photos.html", local=False)
 
+    def configured_accent():
+        accent = service.config.get("accent_color")
+        return accent if isinstance(accent, str) and accent in ACCENT_COLORS else DEFAULT_ACCENT
+
     @web.get("/api/appearance")
     def get_appearance():
-        accent = service.config.get("accent_color")
-        if not isinstance(accent, str) or accent not in ACCENT_COLORS:
-            accent = DEFAULT_ACCENT
-        response = jsonify({"accent_color": accent, "colors": ACCENT_COLORS})
+        response = jsonify({"accent_color": configured_accent(), "colors": ACCENT_COLORS})
         response.headers["Cache-Control"] = "no-store"
         return response
 
@@ -1590,6 +1603,7 @@ def create_app(service, admin_port=ADMIN_PORT):
             minimum, min(30, int(service.config.get("sequence_countdown_seconds", 2)))
         )
         result["config"]["save_on_camera"] = service.config.get("save_on_camera") is True
+        result["config"]["accent_color"] = configured_accent()
         return jsonify(result)
 
     @web.get("/api/local-admin/wifi")
