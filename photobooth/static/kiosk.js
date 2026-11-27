@@ -5,13 +5,13 @@ if (new URLSearchParams(location.search).get("hide_cursor") === "1") {
 
 let state = null;
 let connected = false;
+let refreshPending = false;
 let serverInstanceId = null;
-let lastVersion = "";
 let photoWallVersion = null;
-let photoWallRows = null;
+let gallerySession = null;
 let photoWallPhotos = [];
 let photoWallRequest = false;
-let photoWallLayout = "";
+let galleryLayout = "";
 let pickerOpen = false;
 let capsLock = false;
 let adminHoldTimer = null;
@@ -74,7 +74,7 @@ function render(current) {
     logo.removeAttribute("src");
   }
   logo.classList.toggle("hidden", !current.active_footer_logo);
-  $("#event-footer").classList.toggle("hidden", !current.session || current.phase !== "idle");
+  $("#event-footer").classList.toggle("hidden", !current.session);
   $("#capture-count").textContent = Number(current.capture_count || 0).toLocaleString();
   const queuedUploads = Number(current.queued_uploads || 0);
   const galleryUploadConfigured = !!current.gallery_upload_configured;
@@ -93,48 +93,54 @@ function render(current) {
   if ($("#selfie-status").textContent !== selfieLabel) $("#selfie-status").textContent = selfieLabel;
   const online = !!current.host_info?.internet_connected;
   const hotspot = current.host_info?.hotspot;
-  $("#hotspot-stat").classList.toggle("hidden", !hotspot);
-  $("#hotspot-divider").classList.toggle("hidden", !hotspot);
   $("#picker-hotspot").classList.toggle("hidden", !hotspot);
-  const hotspotSsid = hotspot?.ssid || "";
-  const pickerHotspot = hotspot ? `Hotspot active · ${hotspot.ssid} · ${hotspot.ip}:8081` : "";
-  if ($("#hotspot-ssid").textContent !== hotspotSsid) $("#hotspot-ssid").textContent = hotspotSsid;
-  if ($("#picker-hotspot").textContent !== pickerHotspot) $("#picker-hotspot").textContent = pickerHotspot;
-  $("#internet-status").textContent = online ? "ONLINE" : "OFFLINE";
-  $("#internet-indicator").classList.toggle("offline", !online);
-  const photoWall = $("#photo-wall");
-  const overlay = $("#overlay");
-  renderPhotoWall();
+  $("#picker-hotspot").textContent = hotspot ? `Hotspot active · ${hotspot.ssid} · ${hotspot.ip}:8081` : "";
+  $("#internet-status").textContent = hotspot ? "HOTSPOT ACTIVE" : online ? "ONLINE" : "OFFLINE";
+  $("#network-detail").textContent = hotspot ? hotspot.ssid : "INTERNET";
+  $("#internet-indicator").classList.toggle("offline", !hotspot && !online);
 
-  const activePhases = ["countdown", "capturing", "result"];
+  if (gallerySession !== current.session?.id) {
+    gallerySession = current.session?.id;
+    photoWallPhotos = [];
+    photoWallVersion = null;
+    galleryLayout = "";
+  }
+  const capturing = current.phase === "countdown" || current.phase === "capturing";
   $("#empty").classList.toggle("hidden", !!current.session);
-  photoWall.classList.toggle("hidden", !current.session || current.phase !== "idle");
-  overlay.classList.toggle("hidden", !activePhases.includes(current.phase));
-  $("#photo-position").classList.toggle("hidden", current.phase === "result" || current.photo_total < 2);
-  $("#photo-position").textContent = current.photo_total > 1
+  $("#photo-wall").classList.toggle("hidden", !current.session);
+  renderPhotoWall();
+  const lead = $(".lead-photo");
+  const loadingResult = current.phase === "result" &&
+    (photoWallVersion !== current.photo_wall_version || (lead && !lead.complete));
+  $("#overlay").classList.toggle("hidden", !capturing && !loadingResult);
+  const downloading = current.status === "Downloading four photos";
+  const detail = $("#capture-detail");
+  const preparingCollage = current.status === "Preparing collage" ||
+    (loadingResult && detail.classList.contains("sequence-finish"));
+  const finishingSequence = downloading || preparingCollage;
+  $("#photo-position").classList.toggle("hidden",
+    finishingSequence || current.phase === "result" || current.photo_total < 2 || current.photo_number < 1);
+  $("#photo-position").textContent = current.photo_total > 1 && current.photo_number > 0
     ? `PHOTO ${current.photo_number} / ${current.photo_total}`
     : "";
   const showingCapture = current.phase === "capturing";
-  const showingFinalCapture = showingCapture && current.photo_total === 4 && current.photo_number === 4;
-  $("#sequence-processing").classList.toggle("hidden", !showingFinalCapture);
-  $("#countdown").classList.toggle("hidden", !(current.phase === "countdown" || showingCapture) || !current.countdown);
-  $("#countdown").textContent = current.phase === "countdown" || showingCapture ? current.countdown : "";
-  $("#capture-detail").classList.toggle("hidden", !showingCapture);
-  $("#capture-detail").textContent = current.photo_total > 1
-    ? `Photo ${current.photo_number} of ${current.photo_total} is being captured and downloaded from the camera.`
-    : "Your photo is being captured and downloaded from the camera.";
-  $("#result").classList.toggle("hidden", current.phase !== "result");
-  $("#result-review").classList.toggle("hidden", current.phase !== "result");
-  if (current.phase === "result" && current.recent_photo_version !== lastVersion) {
-    lastVersion = current.recent_photo_version;
-    const duration = current.result_duration_seconds * 1000;
-    const timer = $("#review-fill").animate(
-      [{ transform: "scaleX(1)" }, { transform: "scaleX(0)" }],
-      { duration, fill: "forwards" },
-    );
-    timer.currentTime = duration - current.result_remaining_seconds * 1000;
-    $("#result").src = `/api/recent-photo?v=${encodeURIComponent(lastVersion)}`;
+  const preparing = capturing && current.prepare_elapsed != null;
+  const showProgress = preparing || loadingResult;
+  const progress = $("#capture-progress");
+  progress.classList.toggle("hidden", !showProgress);
+  if (preparing && current.photo_number === current.photo_total && current.prepare_estimate > 0) {
+    progress.value = Math.min(0.95, current.prepare_elapsed / current.prepare_estimate);
+  } else if (!loadingResult) {
+    progress.removeAttribute("value");
   }
+  $("#countdown").classList.toggle("hidden", !capturing || !current.countdown);
+  $("#countdown").textContent = capturing ? current.countdown : "";
+  detail.classList.toggle("hidden", !showProgress && !showingCapture);
+  detail.classList.toggle("sequence-finish", finishingSequence);
+  detail.textContent = downloading ? "Downloading four photos…"
+    : preparingCollage ? "Preparing collage…"
+    : current.photo_total === 4 ? `Taking photo ${current.photo_number} of 4…`
+    : "Preparing your photo…";
   $("#error").textContent = current.status.startsWith("Capture failed") ? current.status : "";
   if (!current.session && !current.locked_session) showSessionPicker(current.sessions || []);
   if (current.session) closeSessionPicker();
@@ -242,49 +248,68 @@ function setConnectionStatus(isConnected) {
 
 
 function renderPhotoWall() {
-  if (!state) return;
-  const photoWall = $("#photo-wall");
-  const columns = Math.max(1, Number(state.photo_wall_columns) || 3);
-  const layout = `${columns}:${photoWallPhotos.map((photo) => photo.name).join("|")}`;
-  if (layout === photoWallLayout) return;
-  photoWallLayout = layout;
-  photoWall.replaceChildren();
-  photoWall.style.gridTemplateColumns = `repeat(${columns},minmax(0,1fr))`;
-  photoWall.style.gridTemplateRows = "none";
-  photoWall.style.gridAutoRows = `${window.innerWidth / columns * 9 / 16}px`;
-  photoWallPhotos.forEach((photo, index) => {
-    const image = new Image();
-    image.src = `${photo.url}?v=${encodeURIComponent(photo.name)}`;
-    image.alt = `Photo ${index + 1}`;
-    photoWall.append(image);
+  const wall = $("#photo-wall");
+  const slots = Number(state.photo_wall_columns) || 3;
+  const capturing = state.phase === "countdown" || state.phase === "capturing";
+  // Keep the old lead in the rail until the saved result arrives.
+  const awaitingResult = state.phase === "result" && photoWallVersion !== state.photo_wall_version;
+  const reserveLead = capturing || awaitingResult;
+  const photos = photoWallPhotos.slice(0, slots + (reserveLead ? 0 : 1));
+  const layout = JSON.stringify([slots, reserveLead, photos.map(photo => photo.url)]);
+  $("#first-capture").classList.toggle("hidden", reserveLead || photos.length > 0 || !photoWallVersion);
+  if (layout === galleryLayout) return;
+  galleryLayout = layout;
+
+  const existing = new Map(Array.from(wall.querySelectorAll("img"), img => [img.dataset.url, img]));
+  const oldLead = wall.querySelector(".lead-photo");
+  const before = oldLead?.getBoundingClientRect();
+  wall.style.setProperty("--history-slots", slots);
+  photos.forEach((photo, index) => {
+    const lead = !reserveLead && index === 0;
+    const image = existing.get(photo.url) || new Image();
+    if (!image.parentNode) {
+      image.dataset.url = photo.url;
+      image.src = photo.url;
+      wall.append(image);
+    }
+    existing.delete(photo.url);
+    image.className = lead ? "lead-photo" : "history-photo";
+    image.style.gridRow = lead ? "1 / -1" : String(reserveLead ? index + 1 : index);
+    image.alt = lead ? "Latest capture" : `Previous capture ${image.style.gridRow}`;
   });
+  for (const image of existing.values()) image.remove();
+  if (capturing && oldLead?.isConnected && !matchMedia("(prefers-reduced-motion: reduce)").matches) {
+    const after = oldLead.getBoundingClientRect();
+    if (after.width && after.height) {
+      oldLead.animate([
+        { transform: `translate(${before.x - after.x}px, ${before.y - after.y}px) scale(${before.width / after.width}, ${before.height / after.height})` },
+        { transform: "none" },
+      ], { duration: 300, easing: "ease-out" });
+    }
+  }
 }
 
 async function updatePhotoWall() {
   const version = state?.photo_wall_version;
-  const columns = Math.max(1, Number(state?.photo_wall_columns) || 3);
-  const tileHeight = window.innerWidth / columns * 9 / 16;
-  const rows = Math.max(1, Math.min(12, Math.ceil(window.innerHeight / tileHeight)));
-  if (!version || (version === photoWallVersion && rows === photoWallRows) || photoWallRequest) return;
+  if (!state?.session || !version || version === photoWallVersion || photoWallRequest) return;
   photoWallRequest = true;
   try {
-    const data = await api(`/api/photo-wall?rows=${rows}`);
-    if (state?.photo_wall_version === version) {
+    const data = await api("/api/photo-wall?rows=2");
+    if (state.photo_wall_version === version) {
       photoWallPhotos = data.photos || [];
       photoWallVersion = version;
-      photoWallRows = rows;
       renderPhotoWall();
     }
   } catch (error) {
     $("#error").textContent = error.message;
   } finally {
     photoWallRequest = false;
-    const currentRows = Math.max(1, Math.min(12, Math.ceil(window.innerHeight / (window.innerWidth / Math.max(1, Number(state?.photo_wall_columns) || 3) * 9 / 16))));
-    if (state?.photo_wall_version !== photoWallVersion || currentRows !== photoWallRows) updatePhotoWall();
   }
 }
 
 async function refresh() {
+  if (refreshPending) return;
+  refreshPending = true;
   try {
     const current = await api("/api/state");
     if (serverInstanceId !== null && current.server_instance_id !== serverInstanceId) {
@@ -298,6 +323,8 @@ async function refresh() {
   } catch (error) {
     setConnectionStatus(false);
     $("#error").textContent = error.message;
+  } finally {
+    refreshPending = false;
   }
 }
 
@@ -325,12 +352,6 @@ $("#start-new-session").addEventListener("click", openNewSessionForm);
 $("#back-to-sessions").addEventListener("click", returnToSessionOptions);
 $("#create-session").addEventListener("click", createSession);
 setInterval(refresh, 250);
-window.addEventListener("resize", () => {
-  photoWallLayout = "";
-  renderPhotoWall();
-  updatePhotoWall();
-});
-
 const adminPinDialog = $("#admin-pin-dialog");
 for (const trigger of [$("#admin-access"), $("#camera-admin-access"), $("#selfie-admin-access")]) {
   trigger.addEventListener("pointerdown", (event) => {

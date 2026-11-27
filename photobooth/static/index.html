@@ -12,22 +12,16 @@
 </head>
 <body>
   <main id="screen" class="idle">
-    <div id="photo-wall" class="photo-wall"></div>
-    <section id="overlay" class="overlay hidden">
-      <div id="photo-position" class="photo-position hidden"></div>
-      <div id="countdown" class="countdown"></div>
-      <div class="capture-messages">
-        <p id="capture-detail" class="capture-detail hidden"></p>
-        <p id="sequence-processing" class="sequence-processing hidden" role="status">
-          <span class="spinner" aria-hidden="true"></span>
-          <span>Combining all four photos into one image may take a moment.</span>
-        </p>
-      </div>
-      <img id="result" class="result hidden" alt="Your photo">
-      <div id="result-review" class="result-review hidden">
-        <p>You can take another photo now.</p>
-        <div class="review-track" aria-hidden="true"><span id="review-fill"></span></div>
-      </div>
+    <section id="photo-wall" class="photo-wall hidden" aria-label="Session photos">
+      <p id="first-capture" class="first-capture hidden">Press the button to take your first photo.</p>
+      <section id="overlay" class="overlay hidden">
+        <div id="photo-position" class="photo-position hidden"></div>
+        <div id="countdown" class="countdown"></div>
+        <div class="capture-messages">
+          <p id="capture-detail" class="capture-detail hidden"></p>
+          <progress id="capture-progress" class="hidden" aria-label="Estimated photo preparation progress"></progress>
+        </div>
+      </section>
     </section>
     <div id="empty" class="empty hidden">
       <h1>Photobooth ready</h1>
@@ -45,9 +39,7 @@
         <span class="footer-divider"></span>
         <div id="selfie-stat" class="event-stat selfie-stat hidden" aria-live="polite"><strong id="selfie-status"></strong><span>BLUETOOTH REMOTE</span></div>
         <span id="selfie-divider" class="footer-divider hidden"></span>
-        <div id="hotspot-stat" class="event-stat hidden" role="status"><strong>HOTSPOT ACTIVE</strong><span id="hotspot-ssid"></span></div>
-        <span id="hotspot-divider" class="footer-divider hidden"></span>
-        <div id="admin-access" class="event-stat internet-stat" role="button" tabindex="0" aria-label="Hold to open the local admin panel"><i id="internet-indicator"></i><strong id="internet-status">CHECKING</strong><span>INTERNET</span></div>
+        <div id="admin-access" class="event-stat internet-stat" role="button" tabindex="0" aria-label="Hold to open the local admin panel"><i id="internet-indicator"></i><strong id="internet-status">CHECKING</strong><span id="network-detail">INTERNET</span></div>
       </div>
     </footer>
     <div id="session-dialog" class="session-picker hidden" role="dialog" aria-modal="true">

@@ -39,6 +39,13 @@ async function refresh() {
       : state.phase === "result" ? "Showing result" : "Idle";
     $("#admin-flash").textContent = state.flash_available ? "Ready" : "Unavailable";
     $("#admin-uploads").textContent = `${state.queued_uploads} queued`;
+    const singleMinimum = state.minimum_single_countdown_seconds;
+    settingsForm.elements.countdown_seconds.min = singleMinimum;
+    $("#single-countdown-help").textContent = `Minimum: ${singleMinimum} s based on camera timing.`;
+    const minimum = state.minimum_sequence_countdown_seconds;
+    settingsForm.elements.sequence_countdown_seconds.min = minimum;
+    $("#sequence-countdown-help").textContent =
+      `Minimum between poses: ${minimum} s based on camera timing. The first photo always gets at least 3 s.`;
     for (const [key, value] of Object.entries(state.config || {})) {
       const input = settingsForm.elements.namedItem(key);
       if (input && !editedSettings.has(key) && document.activeElement !== input) input.value = value;
@@ -256,6 +263,9 @@ $("#accent-form").addEventListener("submit", async (event) => {
 settingsForm.addEventListener("submit", async (event) => {
   event.preventDefault();
   const settings = Object.fromEntries(new FormData(event.currentTarget));
+  for (const key of ["countdown_seconds", "sequence_countdown_seconds"]) {
+    if (!editedSettings.has(key)) delete settings[key];
+  }
   if (!settings.upload_token) delete settings.upload_token;
   if (!settings.admin_pin) {
     delete settings.admin_pin;

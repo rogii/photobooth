@@ -7,9 +7,13 @@ import argparse
 import hmac
 import io
 import json
+import math
 import os
+import re
+import select
 import shutil
 import signal
+import statistics
 import subprocess
 import tempfile
 import threading
@@ -18,6 +22,7 @@ import urllib.error
 import urllib.request
 import uuid
 import zipfile
+from contextlib import ExitStack, contextmanager
 from datetime import datetime
 from pathlib import Path
 
@@ -36,6 +41,8 @@ LAST_SESSION = DATA / "last-session.json"
 DISPLAY_FILE = DATA / "latest-display.jpg"
 NEXT_DISPLAY_FILE = DATA / "latest-display-next.jpg"
 LOCKED_SESSION = DATA / "locked-session.json"
+CAPTURE_TIMINGS_FILENAME = "capture-timings.json"
+TIMING_SAMPLE_LIMIT = 3
 ADMIN_PORT = 8081
 SERVER_INSTANCE_ID = uuid.uuid4().hex
 ACCENT_COLORS = {
@@ -112,6 +119,7 @@ class PhotoboothService:
             self.session = dict(self.locked_session)
             self.last_session = dict(self.locked_session)
             self.status = f"Session ready · {self.session['name']}"
+        self.session_timings = self.read_session_timings(self.session)
         self.flash = None
         self.flash_available = False
         self.recent_photo = None
@@ -121,6 +129,8 @@ class PhotoboothService:
         self.phase = "idle"
         self.photo_number = 0
         self.photo_total = 0
+        self.prepare_started = None
+        self.batch_sequence = False
         self.photo_wall_revision = 0
         self.capture_generation = 0
         self.host_info_lock = threading.Lock()
@@ -498,12 +508,16 @@ class PhotoboothService:
         if not item:
             raise ValueError("Session not found")
         folder = self.session_photo_dir(item)
+        event_root = Path(self.safe_event_name(item["name"]))
+        timings = SESSIONS / item["id"] / CAPTURE_TIMINGS_FILENAME
         archive = tempfile.SpooledTemporaryFile(max_size=16 * 1024 * 1024, mode="w+b")
         with zipfile.ZipFile(archive, "w", zipfile.ZIP_DEFLATED) as zipped:
             if folder.is_dir():
                 for photo in sorted(folder.rglob("*")):
                     if photo.is_file() and photo.suffix.lower() in (".jpg", ".jpeg"):
-                        zipped.write(photo, Path(self.safe_event_name(item["name"])) / photo.relative_to(folder))
+                        zipped.write(photo, event_root / photo.relative_to(folder))
+            if timings.is_file():
+                zipped.write(timings, event_root / timings.name)
         archive.seek(0)
         return item, archive
 
@@ -637,8 +651,8 @@ class PhotoboothService:
                 and self.recent_photo_time
                 and self.phase == "result"
             )
-            photo_wall_version = f"{session['id'] if session else 'none'}:{self.photo_wall_revision}"
             photo_wall_columns = max(1, min(12, int(self.config.get("idle_photo_wall_columns", 3))))
+            photo_wall_version = f"{session['id'] if session else 'none'}:{self.photo_wall_revision}:{photo_wall_columns}"
             selfie_configured = bool(self.bluetooth_remote.address)
             selfie_connected = selfie_configured and self.selfie_connected
             return {
@@ -665,6 +679,10 @@ class PhotoboothService:
                 "camera_error": self.camera_error,
                 "demo": self.demo,
                 "phase": self.phase,
+                "prepare_elapsed": time.monotonic() - self.prepare_started if self.prepare_started is not None else None,
+                "prepare_estimate": self.timing_estimate(self.timing_key(self.photo_total), statistics.mean),
+                "minimum_single_countdown_seconds": math.ceil(self.single_capture_lead(self.config)),
+                "minimum_sequence_countdown_seconds": self.minimum_sequence_countdown(),
                 "photo_number": self.photo_number,
                 "photo_total": self.photo_total,
                 "photo_wall_version": photo_wall_version,
@@ -729,15 +747,14 @@ class PhotoboothService:
                 config["accent_color"] = accent
             if "save_on_camera" in values:
                 config["save_on_camera"] = values["save_on_camera"]
-            try:
-                with tempfile.TemporaryDirectory(dir=CONFIG_PATH.parent) as temp_dir:
-                    pending_config = Path(temp_dir) / CONFIG_PATH.name
-                    pending_config.write_text(json.dumps(config, ensure_ascii=False, indent=2) + "\n")
-                    pending_config.replace(CONFIG_PATH)
-            except OSError as exc:
-                raise RuntimeError("Could not save settings to config.json") from exc
+            for key, label, minimum in (
+                ("countdown_seconds", "Single-photo", math.ceil(self.single_capture_lead(config))),
+                ("sequence_countdown_seconds", "Sequence", self.minimum_sequence_countdown()),
+            ):
+                if key in values and config[key] < minimum:
+                    raise ValueError(f"{label} countdown must be at least {minimum} seconds for the camera lead.")
             previous_gpio_pin = self.config.get("gpio_flash_pin", 17)
-            self.config = config
+            self.save_config(config)
             if config.get("gpio_flash_pin", 17) != previous_gpio_pin:
                 if self.flash:
                     self.flash.close()
@@ -745,6 +762,66 @@ class PhotoboothService:
                 self.flash_available = False
                 self._init_gpio()
             return {key: config.get(key) for key in values if key != "upload_token"}
+
+    def save_config(self, config):
+        # Call with state_lock held so learned timings and admin edits stay in sync.
+        try:
+            with tempfile.TemporaryDirectory(dir=CONFIG_PATH.parent) as temp_dir:
+                pending_config = Path(temp_dir) / CONFIG_PATH.name
+                pending_config.write_text(json.dumps(config, ensure_ascii=False, indent=2) + "\n")
+                pending_config.replace(CONFIG_PATH)
+        except OSError as exc:
+            raise RuntimeError("Could not save settings to config.json") from exc
+        self.config = config
+
+    @staticmethod
+    def read_session_timings(session):
+        if not session:
+            return {}
+        try:
+            path = SESSIONS / session["id"] / CAPTURE_TIMINGS_FILENAME
+            data = json.loads(path.read_text())
+        except (OSError, ValueError):
+            return {}
+        if not isinstance(data, dict):
+            return {}
+        return {
+            key: [sample for sample in samples[-TIMING_SAMPLE_LIMIT:]
+                  if type(sample) in (float, int) and math.isfinite(sample) and sample >= 0]
+            for key, samples in data.items() if isinstance(samples, list)
+        }
+
+    def timing_estimate(self, key, summarize, default=None):
+        samples = self.session_timings.get(key) if self.session else None
+        return summarize(samples) if samples else default
+
+    def record_capture_timings(self, samples):
+        for key, value in samples.items():
+            history = self.session_timings.get(key, [])
+            self.session_timings[key] = [*history, round(value, 3)][-TIMING_SAMPLE_LIMIT:]
+        path = SESSIONS / self.session["id"] / CAPTURE_TIMINGS_FILENAME
+        with tempfile.TemporaryDirectory(dir=path.parent) as temp_dir:
+            pending = Path(temp_dir) / path.name
+            pending.write_text(json.dumps(self.session_timings, indent=2) + "\n")
+            pending.replace(path)
+
+    def single_capture_lead(self, config):
+        fallback = float(config.get("capture_lead_seconds", 1.2))
+        lead = self.timing_estimate("single_capture_lead_seconds", statistics.median, fallback)
+        return max(0.0, min(5.0, lead))
+
+    def sequence_capture_lead(self):
+        lead = self.timing_estimate("sequence_capture_lead_seconds", statistics.median, 0.5)
+        return max(0.0, min(5.0, lead))
+
+    def minimum_sequence_countdown(self):
+        return math.ceil(self.sequence_capture_lead())
+
+    def timing_key(self, count):
+        mode = "single"
+        if count == 4:
+            mode = "batch_collage" if self.batch_sequence else "collage"
+        return f"{'demo_' if self.demo else ''}{mode}_prepare_seconds"
 
     def set_status(self, value):
         with self.state_lock:
@@ -757,6 +834,7 @@ class PhotoboothService:
     def activate_session(self, selected):
         if not self.session or selected["id"] != self.session["id"]:
             self.selfie_seen = self.selfie_connected
+            self.session_timings = self.read_session_timings(selected)
         self.session = selected
 
     def create_session(self, name):
@@ -773,6 +851,7 @@ class PhotoboothService:
                 "created_at": now.isoformat(),
                 "hidden": False,
             }
+            self.session_timings = {}
             self.session["photo_dir"] = f"{self.safe_event_name(self.session['name'])}--{self.session['id']}"
             self.last_session = dict(self.session)
             self.status = f"Session ready · {self.session['name']}"
@@ -861,7 +940,7 @@ class PhotoboothService:
             raise ValueError("Capture count must be one or four")
         delay = max(0, min(30, int(self.config.get("countdown_seconds", 3))))
         sequence_delay = max(0, min(30, int(self.config.get("sequence_countdown_seconds", 2))))
-        interval = max(0, min(10, float(self.config.get("sequence_interval_seconds", 0.8))))
+        interval = max(0, min(10, float(self.config.get("sequence_interval_seconds", 0))))
         self.start_capture(count, delay, interval, sequence_delay)
 
     def start_capture(self, count, delay, interval, sequence_delay=None):
@@ -876,27 +955,84 @@ class PhotoboothService:
             self.recent_photo = None
             self.recent_photo_version = ""
             self.recent_photo_time = None
+            self.batch_sequence = False
             self.status = "Preparing capture"
             self.phase = "countdown"
-            self.photo_number = 0
+            self.photo_number = 1
             self.photo_total = count
+            sequence_delay = delay if sequence_delay is None else sequence_delay
+            if count == 4:
+                sequence_delay = max(sequence_delay, self.minimum_sequence_countdown())
+            else:
+                delay = max(delay, math.ceil(self.single_capture_lead(self.config)))
+            first_delay = delay if count == 1 else max(3, sequence_delay)
+            self.countdown = str(first_delay) if first_delay else ""
         threading.Thread(
             target=self.capture_flow,
-            args=(count, delay, interval, sequence_delay if sequence_delay is not None else delay, generation),
+            args=(count, delay, interval, sequence_delay, generation),
             daemon=True,
             name="photo-capture",
         ).start()
 
     def capture_flow(self, count, delay, interval, sequence_delay, generation):
         result_ready = False
+        camera_session = ExitStack()
         try:
             files = []
-            photo_delay = delay if count == 1 else sequence_delay
+            camera_frames = []
+            trigger_windows = []
+            exposure_times = []
+            camera_clock_offset = None
+            learned_lead = None
+            single_lead = self.single_capture_lead(self.config)
+            batch = False
+            setup_error = None
+            previous_capture = None
+
+            def prepare_camera():
+                nonlocal batch, camera, setup_error
+                try:
+                    batch = not self.demo and self.has_sequence_card()
+                    if batch:
+                        camera = camera_session.enter_context(self.camera_connection(use_card=True))
+                    with self.state_lock:
+                        self.batch_sequence = batch
+                except Exception as exc:
+                    setup_error = exc
+
+            def collect_capture(pending):
+                thread, result = pending
+                thread.join()
+                if "error" in result:
+                    raise result["error"]
+                photo = result["photo"]
+                if batch:
+                    if photo in camera_frames:
+                        raise RuntimeError("Camera reported a duplicate frame. Check the memory card.")
+                    camera_frames.append(photo)
+                    trigger_windows.append((result["started"], result["finished"]))
+                else:
+                    if not self.demo:
+                        if count == 1:
+                            exposure_times.append(self.exposure_timestamp(photo))
+                            trigger_windows.append((result["started"], result["finished"]))
+                        self.normalize_photo(photo)
+                    files.append(photo)
+
+            camera = None
+            setup_thread = None
+            if count == 4:
+                setup_thread = threading.Thread(target=prepare_camera, name="sequence-camera-setup")
+                setup_thread.start()
+
             for index in range(count):
+                photo_delay = delay if count == 1 else max(3, sequence_delay) if index == 0 else sequence_delay
                 with self.state_lock:
                     self.photo_number = index + 1
                     self.photo_total = count
                     self.phase = "countdown"
+                    self.countdown = str(photo_delay) if photo_delay else ""
+                    self.prepare_started = None
                 capture_result = {}
                 capture_thread = None
 
@@ -905,14 +1041,19 @@ class PhotoboothService:
                     if capture_thread is not None:
                         return
 
-                    def capture_in_background():
+                    def capture_in_background(result=capture_result):
                         try:
+                            result["started"] = time.monotonic()
                             if self.flash:
                                 self.flash.on()
                                 time.sleep(float(self.config.get("flash_seconds", 0.18)))
-                            capture_result["photo"] = self.capture_one(sequence_frame=(count == 4))
+                            if batch:
+                                result["photo"] = self.capture_to_card(camera)
+                            else:
+                                result["photo"] = self.capture_one(sequence_frame=(count == 4))
+                            result["finished"] = time.monotonic()
                         except Exception as exc:
-                            capture_result["error"] = exc
+                            result["error"] = exc
                         finally:
                             if self.flash:
                                 self.flash.off()
@@ -924,42 +1065,89 @@ class PhotoboothService:
                     )
                     capture_thread.start()
 
-                capture_lead = max(0.0, min(5.0, float(self.config.get("capture_lead_seconds", 1.2))))
-                if photo_delay > 0:
-                    countdown_start = time.monotonic()
-                    zero_at = countdown_start + photo_delay + 0.65
-                    trigger_at = zero_at - capture_lead
-                    for remaining in range(photo_delay, 0, -1):
-                        self.set_countdown(str(remaining))
-                        tick_at = countdown_start + (photo_delay - remaining + 1)
-                        while time.monotonic() < tick_at:
-                            now = time.monotonic()
-                            if capture_thread is None and now >= trigger_at:
-                                start_camera_capture()
-                            time.sleep(min(0.025, max(0.001, tick_at - now)))
-                    self.set_countdown("SMILE")
-                    self.set_status("Smile!")
-                    while time.monotonic() < zero_at:
+                manual_lead = max(0.0, min(5.0, float(self.config.get("capture_lead_seconds", 1.2))))
+                sequence_lead = self.sequence_capture_lead()
+                countdown_start = time.monotonic()
+                zero_at = countdown_start + photo_delay
+                for remaining in range(photo_delay, 0, -1):
+                    self.set_countdown(str(remaining))
+                    tick_at = countdown_start + photo_delay - remaining + 1
+                    show_zero_at = time.monotonic() + 1 if remaining == 1 else None
+                    if show_zero_at is not None:
+                        tick_at = max(tick_at, show_zero_at + 0.4)
+                    showing_zero = False
+                    while time.monotonic() < tick_at:
                         now = time.monotonic()
-                        if capture_thread is None and now >= trigger_at:
+                        setup_ready = setup_thread is None or not setup_thread.is_alive()
+                        previous_ready = previous_capture is None or not previous_capture[0].is_alive()
+                        capture_lead = sequence_lead if batch else single_lead if count == 1 else manual_lead
+                        if capture_thread is None and setup_ready and previous_ready and now >= zero_at - capture_lead:
+                            if setup_error:
+                                raise setup_error
+                            if previous_capture:
+                                collect_capture(previous_capture)
+                                previous_capture = None
                             start_camera_capture()
-                        time.sleep(min(0.025, max(0.001, zero_at - now)))
-                else:
-                    self.set_countdown("")
-                    start_camera_capture()
+                            # If the camera was busy at the scheduled trigger, preserve
+                            # the learned lead before advancing to the next pose.
+                            extension = max(0, now + capture_lead - zero_at)
+                            countdown_start += extension
+                            zero_at += extension
+                            tick_at = (max(zero_at, show_zero_at + 0.4)
+                                       if show_zero_at is not None else tick_at + extension)
+                        if show_zero_at is not None and not showing_zero and now >= show_zero_at:
+                            self.set_countdown("0")
+                            showing_zero = True
+                        time.sleep(min(0.025, max(0.001, tick_at - now)))
 
+                if setup_thread is not None:
+                    setup_thread.join()
+                    if setup_error:
+                        raise setup_error
+                if previous_capture:
+                    collect_capture(previous_capture)
+                    previous_capture = None
                 if capture_thread is None:
                     start_camera_capture()
-                with self.state_lock:
-                    self.phase = "capturing"
-                    self.status = f"Capturing photo {index + 1} of {count}"
-                capture_thread.join()
-                if "error" in capture_result:
-                    raise capture_result["error"]
-                photo = capture_result["photo"]
-                files.append(photo)
-                if index + 1 < count:
+                    if batch and photo_delay and sequence_lead:
+                        time.sleep(sequence_lead)
+
+                if batch and index + 1 < count:
+                    previous_capture = (capture_thread, capture_result)
+                else:
+                    with self.state_lock:
+                        self.countdown = ""
+                        self.prepare_started = time.monotonic()
+                        self.phase = "capturing"
+                        self.status = f"Capturing photo {index + 1} of {count}"
+                        if count == 4 and index + 1 == count:
+                            self.status = "Downloading four photos"
+                    collect_capture((capture_thread, capture_result))
+                if index + 1 < count and interval:
                     time.sleep(interval)
+            try:
+                if batch:
+                    camera_clock_offset = self.camera_clock_offset(camera)
+                elif count == 1 and exposure_times and exposure_times[0] is not None:
+                    with self.camera_connection() as clock_camera:
+                        camera_clock_offset = self.camera_clock_offset(clock_camera)
+            except (OSError, RuntimeError) as exc:
+                print(f"Capture saved on camera or disk; shutter calibration skipped: {exc}", flush=True)
+            camera_session.close()
+            if batch:
+                files = self.download_sequence(camera_frames, exposure_times)
+            if camera_clock_offset is not None:
+                delays = []
+                for exposure, (started, finished) in zip(exposure_times, trigger_windows):
+                    if exposure is None:
+                        continue
+                    shutter = exposure + camera_clock_offset
+                    if started - 0.15 <= shutter <= finished + 0.15 and shutter - started <= 5:
+                        delays.append(max(0, shutter - started))
+                if len(delays) >= (3 if batch else 1):
+                    learned_lead = statistics.median(delays)
+            if count == 4:
+                self.set_status("Preparing collage")
             result = self.make_result(files)
             event_folder = self.session_photo_dir(self.session)
             event_folder.mkdir(parents=True, exist_ok=True)
@@ -976,8 +1164,6 @@ class PhotoboothService:
             session = self.session
             display_result = self.make_overlaid_photo(result, session)
             self.make_display_image(display_result)
-            with self.state_lock:
-                self.photo_wall_revision += 1
             queued = UPLOAD_QUEUE / f"{session['id']}-{result.name}.json"
             queued.write_text(json.dumps({
                 "file": str(result),
@@ -986,6 +1172,7 @@ class PhotoboothService:
                 "idempotency_key": uuid.uuid4().hex,
             }))
             with self.state_lock:
+                self.photo_wall_revision += 1
                 self.recent_photo = DISPLAY_FILE
                 self.recent_photo_version = result.name
                 self.result_duration = max(1, int(self.config.get("result_timeout_seconds", 8)))
@@ -996,16 +1183,26 @@ class PhotoboothService:
                 self.photo_number = 0
                 self.photo_total = 0
                 result_ready = True
+                samples = {self.timing_key(count): self.recent_photo_time - self.prepare_started}
+                if learned_lead is not None:
+                    lead_key = "sequence_capture_lead_seconds" if batch else "single_capture_lead_seconds"
+                    samples[lead_key] = learned_lead
+                try:
+                    self.record_capture_timings(samples)
+                except OSError as exc:
+                    print(f"Capture saved, but its timing could not be persisted: {exc}", flush=True)
         except Exception as exc:
             with self.state_lock:
                 self.camera_available = False
                 self.camera_error = str(exc)
             self.set_status(f"Capture failed · {exc}")
         finally:
+            camera_session.close()
             if self.flash:
                 self.flash.off()
             self.set_countdown("")
             with self.state_lock:
+                self.prepare_started = None
                 self.busy = False
             if result_ready:
                 time.sleep(max(0, result_deadline - time.monotonic()))
@@ -1014,6 +1211,131 @@ class PhotoboothService:
                     self.phase = "idle"
                     self.photo_number = 0
                     self.photo_total = 0
+
+    def camera_command(self, *arguments):
+        command = self.config.get("camera_command", "gphoto2")
+        with self.camera_lock:
+            result = subprocess.run(
+                [command, *arguments], capture_output=True, text=True, timeout=90,
+                env={**os.environ, "LC_ALL": "C"},
+            )
+        if result.returncode:
+            raise RuntimeError((result.stderr or result.stdout or "Camera command failed").strip()[-400:])
+        return result.stdout
+
+    def has_sequence_card(self):
+        try:
+            info = self.camera_command("--get-config", "capturetarget", "--storage-info")
+        except (OSError, RuntimeError, subprocess.TimeoutExpired):
+            return False
+        return ("Choice: 1 Memory card" in info and "Readonly: 0" in info
+                and any("access=0 Read-Write" in storage and
+                        re.search(r"^free=[1-9]\d* KB", storage, re.MULTILINE)
+                        for storage in info.split("[Storage ")[1:]))
+
+    @contextmanager
+    def camera_connection(self, use_card=False):
+        command = self.config.get("camera_command", "gphoto2")
+        options = ["--set-config-index", "capturetarget=1"] if use_card else []
+        with self.camera_lock, subprocess.Popen(
+            ["stdbuf", "-oL", command, "--quiet", *options, "--shell"],
+            stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+            env={**os.environ, "LC_ALL": "C"},
+        ) as camera:
+            try:
+                if use_card:
+                    settings = self.sequence_command(camera, "get-config capturetarget")
+                    if "Current: Memory card" not in settings:
+                        raise RuntimeError("Camera did not select its memory card for the sequence.")
+                yield camera
+            finally:
+                try:
+                    camera.communicate(b"exit\n", timeout=5)
+                except subprocess.TimeoutExpired:
+                    camera.kill()
+                    camera.communicate()
+
+    @staticmethod
+    def sequence_command(camera, command, timeout=90):
+        # The shell keeps the camera open. A local-only directory command marks
+        # the end of each response, including when the camera rejects a shot.
+        camera.stdin.write(f"{command}\nlcd /\n".encode())
+        camera.stdin.flush()
+        output = bytearray()
+        deadline = time.monotonic() + timeout
+        while b"Local directory now '/'.\n" not in output:
+            remaining = deadline - time.monotonic()
+            if remaining <= 0 or not select.select([camera.stdout], [], [], remaining)[0]:
+                raise RuntimeError("Timed out waiting for the camera.")
+            chunk = os.read(camera.stdout.fileno(), 4096)
+            if not chunk:
+                raise RuntimeError("Camera connection closed.")
+            output.extend(chunk)
+        return output.decode(errors="replace")
+
+    def camera_clock_offset(self, camera):
+        # The first command on a fresh connection can include camera startup.
+        self.sequence_command(camera, "get-config datetime", timeout=5)
+        # Bound a camera-clock second rollover with two monotonic samples.
+        previous = None
+        deadline = time.monotonic() + 1.6
+        while time.monotonic() < deadline:
+            started = time.monotonic()
+            output = self.sequence_command(camera, "get-config datetime", timeout=2)
+            finished = time.monotonic()
+            match = re.search(r"^Current: (\d+)\s*$", output, re.MULTILINE)
+            if not match:
+                return None
+            second = int(match[1])
+            if previous and second == previous[0] + 1 and finished - previous[1] <= 0.25:
+                return (previous[1] + finished) / 2 - second
+            previous = (second, started)
+            time.sleep(0.04)
+        return None
+
+    @staticmethod
+    def exposure_timestamp(path):
+        try:
+            with Image.open(path) as image:
+                exif = image.getexif().get_ifd(34665)
+                fraction = str(exif.get(37521, "")).strip()
+                if not fraction.isascii() or not fraction.isdecimal():
+                    return None
+                second = datetime.strptime(exif.get(36867, ""), "%Y:%m:%d %H:%M:%S")
+                return second.timestamp() + float(f"0.{fraction}")
+        except (OSError, TypeError, ValueError, OverflowError):
+            return None
+
+    def capture_to_card(self, camera):
+        output = self.sequence_command(camera, "capture-image")
+        frames = [Path(line.strip()) for line in output.splitlines()
+                  if line.startswith("/") and Path(line.strip()).suffix.lower() in {".jpg", ".jpeg"}]
+        if len(frames) != 1 or ".." in frames[0].parts:
+            raise RuntimeError("Camera did not identify one captured JPEG. Check the memory card.")
+        return frames[0]
+
+    def download_sequence(self, camera_frames, exposure_times):
+        folder = self.session_photo_dir(self.session) / "sequence"
+        folder.mkdir(parents=True, exist_ok=True)
+        files = []
+        with tempfile.TemporaryDirectory(dir=folder) as staging:
+            for index, frame in enumerate(camera_frames):
+                path = Path(staging) / f"{index}.jpg"
+                self.camera_command("--folder", str(frame.parent), "--filename", str(path),
+                                    "--get-file", frame.name)
+                files.append(path)
+            for path in files:
+                exposure_times.append(self.exposure_timestamp(path))
+                self.normalize_photo(path)
+            prefix = datetime.now().strftime("%Y%m%d-%H%M%S-%f")
+            saved = [path.replace(folder / f"{prefix}-{path.name}") for path in files]
+        if self.config.get("save_on_camera") is not True:
+            for frame in camera_frames:
+                try:
+                    self.camera_command("--folder", str(frame.parent), "--delete-file", frame.name)
+                except (RuntimeError, OSError, subprocess.TimeoutExpired) as exc:
+                    print(f"Sequence downloaded; could not remove {frame} from camera: {exc}", flush=True)
+        return saved
 
     def capture_one(self, sequence_frame=False):
         session = self.session
@@ -1041,7 +1363,6 @@ class PhotoboothService:
             )
         if result.returncode != 0 or not path.exists():
             raise RuntimeError((result.stderr or result.stdout or "Camera returned no photo").strip()[-400:])
-        self.normalize_photo(path)
         return path
 
     def normalize_photo(self, path):
@@ -1211,6 +1532,14 @@ def create_app(service, admin_port=ADMIN_PORT):
         result["footer_logos"] = service.list_footer_logos()
         result["wifi"] = service.wifi.details()
         result["config"] = {key: service.config.get(key, "") for key in ("countdown_seconds", "sequence_countdown_seconds", "capture_lead_seconds", "sequence_interval_seconds", "idle_photo_wall_columns", "result_timeout_seconds", "camera_command", "upload_url", "gpio_flash_pin", "flash_seconds", "key_single", "key_sequence")}
+        single_minimum = result["minimum_single_countdown_seconds"]
+        result["config"]["countdown_seconds"] = max(
+            single_minimum, min(30, int(service.config.get("countdown_seconds", 3)))
+        )
+        minimum = result["minimum_sequence_countdown_seconds"]
+        result["config"]["sequence_countdown_seconds"] = max(
+            minimum, min(30, int(service.config.get("sequence_countdown_seconds", 2)))
+        )
         result["config"]["save_on_camera"] = service.config.get("save_on_camera") is True
         return jsonify(result)
 
@@ -1507,7 +1836,7 @@ def create_app(service, admin_port=ADMIN_PORT):
     @web.get("/api/state")
     def get_state():
         state = service.state()
-        public = {key: state[key] for key in ("session", "busy", "status", "countdown", "photo_number", "photo_total", "recent_photo", "recent_photo_version", "result_duration_seconds", "result_remaining_seconds", "phase", "photo_wall_version", "photo_wall_columns", "active_footer_logo", "capture_count", "queued_uploads", "gallery_upload_configured", "sessions", "locked_session", "host_info", "camera_available", "camera_error", "selfie_button_status")}
+        public = {key: state[key] for key in ("session", "busy", "status", "countdown", "prepare_elapsed", "prepare_estimate", "photo_number", "photo_total", "recent_photo", "recent_photo_version", "result_duration_seconds", "result_remaining_seconds", "phase", "photo_wall_version", "photo_wall_columns", "active_footer_logo", "capture_count", "queued_uploads", "gallery_upload_configured", "sessions", "locked_session", "host_info", "camera_available", "camera_error", "selfie_button_status")}
         public["server_instance_id"] = SERVER_INSTANCE_ID
         public["selfie_button_configured"] = state["selfie_button_configured"]
         public["admin_pin_length"] = len(str(service.config.get("admin_pin", "1234")))
@@ -1557,7 +1886,7 @@ def create_app(service, admin_port=ADMIN_PORT):
             default_delay = service.config.get("sequence_countdown_seconds", 2) if count == 4 else service.config.get("countdown_seconds", 3)
             delay = max(0, min(30, int(payload.get("countdown", default_delay))))
             sequence_delay = max(0, min(30, int(service.config.get("sequence_countdown_seconds", 2))))
-            interval = max(0, min(10, float(payload.get("interval", service.config.get("sequence_interval_seconds", 0.8)))))
+            interval = max(0, min(10, float(payload.get("interval", service.config.get("sequence_interval_seconds", 0)))))
             if count not in (1, 4):
                 raise ValueError("Capture count must be one or four")
             service.start_capture(count, delay, interval, sequence_delay)
