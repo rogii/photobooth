@@ -1,0 +1,36 @@
+#!/usr/bin/env python3
+"""Trigger a capture on a running photobooth."""
+
+import argparse
+import json
+import sys
+from urllib.error import HTTPError, URLError
+from urllib.request import Request, urlopen
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--sequence", action="store_true", help="take four photos in sequence")
+    parser.add_argument("--url", default="http://127.0.0.1:8080", help="kiosk URL (default: %(default)s)")
+    args = parser.parse_args()
+    endpoint = args.url.rstrip("/") + "/api/capture"
+    try:
+        request = Request(endpoint, data=json.dumps({"count": 4 if args.sequence else 1}).encode(),
+                          headers={"Content-Type": "application/json"})
+        with urlopen(request, timeout=10) as response:
+            if response.status != 202 or json.load(response) != {"started": True}:
+                sys.exit("The booth did not confirm the capture request.")
+    except HTTPError as error:
+        try:
+            detail = json.load(error).get("error")
+        except (ValueError, AttributeError):
+            detail = None
+        sys.exit(detail or f"The booth returned HTTP {error.code}.")
+    except (URLError, OSError, ValueError) as error:
+        sys.exit(f"Capture request to {endpoint} failed: {error}")
+
+    print("Four-photo sequence started." if args.sequence else "Single capture started.")
+
+
+if __name__ == "__main__":
+    main()

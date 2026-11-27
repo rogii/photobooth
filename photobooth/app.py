@@ -117,6 +117,7 @@ class PhotoboothService:
         self.recent_photo = None
         self.recent_photo_version = ""
         self.recent_photo_time = None
+        self.result_duration = 0
         self.phase = "idle"
         self.photo_number = 0
         self.photo_total = 0
@@ -670,6 +671,8 @@ class PhotoboothService:
                 "photo_wall_columns": photo_wall_columns,
                 "active_footer_logo": self.active_footer_logo,
                 "host_info": self.host_info(),
+                "result_duration_seconds": self.result_duration if photo_visible else 0,
+                "result_remaining_seconds": max(0, self.recent_photo_time + self.result_duration - time.monotonic()) if photo_visible else 0,
             }
 
     def photo_wall(self, rows=3):
@@ -985,7 +988,9 @@ class PhotoboothService:
             with self.state_lock:
                 self.recent_photo = DISPLAY_FILE
                 self.recent_photo_version = result.name
+                self.result_duration = max(1, int(self.config.get("result_timeout_seconds", 8)))
                 self.recent_photo_time = time.monotonic()
+                result_deadline = self.recent_photo_time + self.result_duration
                 self.status = f"Saved · {result.name}"
                 self.phase = "result"
                 self.photo_number = 0
@@ -1003,8 +1008,7 @@ class PhotoboothService:
             with self.state_lock:
                 self.busy = False
             if result_ready:
-                timeout = int(self.config.get("result_timeout_seconds", 8))
-                time.sleep(max(1, timeout))
+                time.sleep(max(0, result_deadline - time.monotonic()))
             with self.state_lock:
                 if generation == self.capture_generation and not self.busy:
                     self.phase = "idle"
@@ -1503,7 +1507,7 @@ def create_app(service, admin_port=ADMIN_PORT):
     @web.get("/api/state")
     def get_state():
         state = service.state()
-        public = {key: state[key] for key in ("session", "busy", "status", "countdown", "photo_number", "photo_total", "recent_photo", "recent_photo_version", "phase", "photo_wall_version", "photo_wall_columns", "active_footer_logo", "capture_count", "queued_uploads", "gallery_upload_configured", "sessions", "locked_session", "host_info", "camera_available", "camera_error", "selfie_button_status")}
+        public = {key: state[key] for key in ("session", "busy", "status", "countdown", "photo_number", "photo_total", "recent_photo", "recent_photo_version", "result_duration_seconds", "result_remaining_seconds", "phase", "photo_wall_version", "photo_wall_columns", "active_footer_logo", "capture_count", "queued_uploads", "gallery_upload_configured", "sessions", "locked_session", "host_info", "camera_available", "camera_error", "selfie_button_status")}
         public["server_instance_id"] = SERVER_INSTANCE_ID
         public["selfie_button_configured"] = state["selfie_button_configured"]
         public["admin_pin_length"] = len(str(service.config.get("admin_pin", "1234")))

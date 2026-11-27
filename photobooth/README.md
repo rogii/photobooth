@@ -109,6 +109,17 @@ The Pi needs a NetworkManager-managed Wi-Fi adapter with access-point support. I
 
 The hotspot credentials are shared across installations. Use a distinct admin PIN for each booth. Changing the PIN from **Persistent settings** requires the current PIN.
 
+## Command-line capture
+
+With a session active, run these commands from the repository root. Each command uses the booth’s configured countdown and returns when the booth accepts the request.
+
+```sh
+./photobooth/capture
+./photobooth/capture --sequence
+```
+
+The default target is the local kiosk on port 8080. From a development computer, pass the Pi’s kiosk URL, for example `./photobooth/capture --url http://photobooth.local:8080`. The command uses Python 3’s standard library and also works with a booth running in demo mode.
+
 ## Bluetooth capture remote
 
 1. Run `./install.sh` on the Pi to install BlueZ and Linux input support. Reboot after the installer adds the user to the Bluetooth input group.

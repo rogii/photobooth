@@ -124,8 +124,15 @@ function render(current) {
     ? `Photo ${current.photo_number} of ${current.photo_total} is being captured and downloaded from the camera.`
     : "Your photo is being captured and downloaded from the camera.";
   $("#result").classList.toggle("hidden", current.phase !== "result");
+  $("#result-review").classList.toggle("hidden", current.phase !== "result");
   if (current.phase === "result" && current.recent_photo_version !== lastVersion) {
     lastVersion = current.recent_photo_version;
+    const duration = current.result_duration_seconds * 1000;
+    const timer = $("#review-fill").animate(
+      [{ transform: "scaleX(1)" }, { transform: "scaleX(0)" }],
+      { duration, fill: "forwards" },
+    );
+    timer.currentTime = duration - current.result_remaining_seconds * 1000;
     $("#result").src = `/api/recent-photo?v=${encodeURIComponent(lastVersion)}`;
   }
   $("#error").textContent = current.status.startsWith("Capture failed") ? current.status : "";
