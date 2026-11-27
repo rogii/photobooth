@@ -6,8 +6,10 @@
   <title>Photobooth Admin</title>
   <link rel="stylesheet" href="/static/appearance.css">
   <link rel="stylesheet" href="/static/admin.css">
+  <link rel="stylesheet" href="/static/setting-autosave.css">
   <script src="/static/appearance.js" defer></script>
   <script src="/static/bluetooth-remote.js" defer></script>
+  <script src="/static/setting-autosave.js" defer></script>
   <script src="/static/admin.js" defer></script>
 </head>
 <body>
@@ -175,34 +177,35 @@
         <form method="dialog"><button class="secondary" autofocus>Close</button></form>
       </header>
       <div class="panel-content">
-        <form id="accent-form">
-          <label>Accent color<select id="accent-color" name="accent_color" disabled></select></label>
-          <button disabled>Save accent color</button>
-          <span id="accent-message" class="muted" role="status"></span>
+        <form id="settings-form" novalidate>
+          <fieldset id="settings-fields" class="settings" disabled>
+            <label>Accent color<select id="accent-color" name="accent_color" disabled></select></label>
+            <label>Single-photo countdown seconds<input name="countdown_seconds" type="number" min="0" max="30" required><small id="single-countdown-help"></small></label>
+            <label>Between shots seconds<input name="sequence_interval_seconds" type="number" min="0" max="10" step="0.1" required></label>
+            <label>Sequence photo countdown seconds<input name="sequence_countdown_seconds" type="number" min="0" max="30" required><small id="sequence-countdown-help">The first photo always gets at least 3 seconds.</small></label>
+            <label>Initial and fallback camera lead (seconds)<input name="capture_lead_seconds" type="number" min="0" max="5" step="0.1" required><small>Single photos and card-based sequences learn their own timing</small></label>
+            <label>Side gallery thumbnails<input name="idle_photo_wall_columns" type="number" min="1" max="12" required></label>
+            <label>Camera command<input name="camera_command" type="text"></label>
+            <label>Save captures on camera
+              <select name="save_on_camera">
+                <option value="false">Off</option>
+                <option value="true">On</option>
+              </select>
+              <small>Keep a copy of each photo on the camera’s memory card.</small>
+            </label>
+            <label>Flash GPIO pin<input name="gpio_flash_pin" type="number" min="0" max="27" required></label>
+            <label>Flash duration seconds<input name="flash_seconds" type="number" min="0" max="5" step="0.01" required></label>
+            <label>Gallery upload URL<input name="upload_url" type="url"><small>Endpoint for uploading queued photos to the hosted Gallery.</small></label>
+            <label>Gallery upload token<input name="upload_token" type="password" autocomplete="new-password" data-save-credential><small>Leave blank to keep the current token.</small></label>
+            <label>Single capture key<input name="key_single" type="text" maxlength="1"></label>
+            <label>Four shot key<input name="key_sequence" type="text" maxlength="1"></label>
+          </fieldset>
         </form>
-        <form id="settings-form" class="settings">
-          <label>Single-photo countdown seconds<input name="countdown_seconds" type="number" min="0" max="30"><small id="single-countdown-help"></small></label>
-          <label>Between shots seconds<input name="sequence_interval_seconds" type="number" min="0" max="10" step="0.1"></label>
-          <label>Sequence photo countdown seconds<input name="sequence_countdown_seconds" type="number" min="0" max="30"><small id="sequence-countdown-help">The first photo always gets at least 3 seconds.</small></label>
-          <label>Initial and fallback camera lead (seconds)<input name="capture_lead_seconds" type="number" min="0" max="5" step="0.1"><small>Single photos and card-based sequences learn their own timing</small></label>
-          <label>Side gallery thumbnails<input name="idle_photo_wall_columns" type="number" min="1" max="12"></label>
-          <label>Camera command<input name="camera_command" type="text"></label>
-          <label>Save captures on camera
-            <select name="save_on_camera">
-              <option value="false">Off</option>
-              <option value="true">On</option>
-            </select>
-            <small>Keep a copy of each photo on the camera’s memory card.</small>
-          </label>
-          <label>Flash GPIO pin<input name="gpio_flash_pin" type="number" min="0" max="27"></label>
-          <label>Flash duration seconds<input name="flash_seconds" type="number" min="0" max="5" step="0.01"></label>
-          <label>Gallery upload URL<input name="upload_url" type="url"><small>Endpoint for uploading queued photos to the hosted Gallery.</small></label>
-          <label>Gallery upload token<input name="upload_token" type="password" autocomplete="new-password"><small>Credential for the hosted Gallery upload endpoint.</small></label>
-          <label>Single capture key<input name="key_single" type="text" maxlength="1"></label>
-          <label>Four shot key<input name="key_sequence" type="text" maxlength="1"></label>
-          <label>Current admin PIN<input name="current_admin_pin" type="password" inputmode="numeric" autocomplete="off"><small>Required when choosing a new PIN.</small></label>
-          <label>New admin PIN<input name="admin_pin" type="password" inputmode="numeric" pattern="[0-9]{4}" maxlength="4" autocomplete="new-password"><small>Enter four digits to change the PIN.</small></label>
-          <button id="save-settings" disabled>Save settings</button>
+        <form id="settings-pin-form" method="post">
+          <label>Current admin PIN<input name="current_admin_pin" type="password" inputmode="numeric" autocomplete="off" required></label>
+          <label>New admin PIN<input name="admin_pin" type="password" inputmode="numeric" pattern="[0-9]{4}" maxlength="4" autocomplete="new-password" required><small>Enter four digits to change the PIN.</small></label>
+          <button>Change PIN</button>
+          <div class="save-feedback" role="status"></div>
         </form>
       </div>
       <p role="status" data-admin-message></p>

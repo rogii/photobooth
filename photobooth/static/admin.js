@@ -1,14 +1,14 @@
 const $ = (selector) => document.querySelector(selector);
 const settingsForm = $("#settings-form");
-const editedSettings = new Set();
+const settingsAutosave = setupSettingAutosave(settingsForm, (name, value) =>
+  api("/api/config", { [name]: name === "save_on_camera" ? value === "true" : value })
+);
 let renderedSessions;
 let bootTime = null;
 
 for (const trigger of document.querySelectorAll("[data-admin-panel]")) {
   trigger.addEventListener("click", () => document.getElementById(trigger.dataset.adminPanel).showModal());
 }
-
-settingsForm.addEventListener("input", (event) => editedSettings.add(event.target.name));
 
 async function api(path, body) {
   const multipart = body instanceof FormData;
@@ -30,6 +30,7 @@ function say(panel, message) {
 }
 
 async function refresh() {
+  const settingsVersion = settingsAutosave.version;
   try {
     const state = await api("/api/admin/state");
     $("#status").textContent = state.status;
@@ -46,11 +47,13 @@ async function refresh() {
     settingsForm.elements.sequence_countdown_seconds.min = minimum;
     $("#sequence-countdown-help").textContent =
       `Minimum between poses: ${minimum} s based on camera timing. The first photo always gets at least 3 s.`;
-    for (const [key, value] of Object.entries(state.config || {})) {
-      const input = settingsForm.elements.namedItem(key);
-      if (input && !editedSettings.has(key) && document.activeElement !== input) input.value = value;
+    if (settingsVersion === settingsAutosave.version) {
+      for (const [key, value] of Object.entries(state.config || {})) {
+        const input = settingsForm.elements.namedItem(key);
+        if (input && !settingsAutosave.hasDraft(key) && document.activeElement !== input) input.value = value;
+      }
+      $("#settings-fields").disabled = false;
     }
-    $("#save-settings").disabled = false;
     renderSessions(state.sessions || [], state.session, state.locked_session);
     renderWifi(state.wifi);
     renderFooterLogos(state.footer_logos || [], state.active_footer_logo);
@@ -244,44 +247,26 @@ $("#event-form").addEventListener("submit", async (event) => {
   }
 });
 
-$("#accent-form").addEventListener("submit", async (event) => {
+$("#settings-pin-form").addEventListener("submit", async (event) => {
   event.preventDefault();
-  const selector = $("#accent-color");
-  const button = event.currentTarget.querySelector("button");
-  const message = $("#accent-message");
+  const form = event.currentTarget;
+  const button = form.querySelector("button");
+  if (button.disabled) return;
+  const status = form.querySelector("[role=status]");
+  const pins = Object.fromEntries(new FormData(form));
   button.disabled = true;
+  status.dataset.state = "pending";
+  status.textContent = "Changing PIN…";
   try {
-    await api("/api/config", { accent_color: selector.value });
-    message.textContent = "Accent color saved";
+    await api("/api/config", pins);
+    form.reset();
+    status.dataset.state = "saved";
+    status.textContent = "✓ PIN changed";
   } catch (error) {
-    message.textContent = error.message;
+    status.dataset.state = "error";
+    status.textContent = error.message;
   } finally {
     button.disabled = false;
-  }
-});
-
-settingsForm.addEventListener("submit", async (event) => {
-  event.preventDefault();
-  const settings = Object.fromEntries(new FormData(event.currentTarget));
-  for (const key of ["countdown_seconds", "sequence_countdown_seconds"]) {
-    if (!editedSettings.has(key)) delete settings[key];
-  }
-  if (!settings.upload_token) delete settings.upload_token;
-  if (!settings.admin_pin) {
-    delete settings.admin_pin;
-    delete settings.current_admin_pin;
-  }
-  try {
-    await api("/api/config", { ...settings, save_on_camera: settings.save_on_camera === "true" });
-    event.target.elements.admin_pin.value = "";
-    event.target.elements.current_admin_pin.value = "";
-    for (const [key, value] of Object.entries(settings)) {
-      if (settingsForm.elements.namedItem(key)?.value === value) editedSettings.delete(key);
-    }
-    say("settings-panel", "Settings saved to config.json");
-    refresh();
-  } catch (error) {
-    say("settings-panel", error.message);
   }
 });
 

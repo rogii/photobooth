@@ -19,47 +19,53 @@ function say(message, isError = false) {
 }
 
 const photoApi = $("[data-photo-api]").dataset.photoApi;
+const photoGrid = $("#photo-grid");
+const togglePhotoSelection = $("#toggle-photo-selection");
 
 let movingPhotos = false;
+let photoRequestId = 0;
 
 async function refreshPhotos() {
+  const requestId = ++photoRequestId;
+  photoGrid.replaceChildren();
+  updatePhotoActions();
   $("#photo-summary").textContent = "Loading photos…";
   try {
     const sessionId = $("#session-filter").value;
     const query = sessionId ? `?session_id=${encodeURIComponent(sessionId)}` : "";
     const data = await api(`${photoApi}/photos${query}`);
+    if (requestId !== photoRequestId) return;
     const filter = $("#session-filter");
     const selected = filter.value;
     filter.replaceChildren(new Option("All sessions", ""));
     data.sessions.forEach((item) => filter.add(new Option(item.name, item.id)));
     filter.value = data.sessions.some((item) => item.id === selected) ? selected : "";
 
-    const grid = $("#photo-grid");
-    grid.replaceChildren();
     $("#photo-summary").textContent = `${data.photos.length} photo${data.photos.length === 1 ? "" : "s"}`;
     if (!data.photos.length) {
       const empty = document.createElement("div");
       empty.className = "empty";
       empty.textContent = "No photos found for this selection.";
-      grid.append(empty);
+      photoGrid.append(empty);
     }
     data.photos.forEach((photo) => {
-      const card = document.createElement("article");
+      const card = document.createElement("button");
       card.className = "photo-card";
+      card.type = "button";
+      card.dataset.sessionId = photo.session_id;
+      card.dataset.relativePath = photo.relative_path;
+      card.setAttribute("aria-pressed", "false");
+      card.addEventListener("click", () => {
+        card.setAttribute("aria-pressed", String(card.getAttribute("aria-pressed") !== "true"));
+        updatePhotoActions();
+      });
       const urlPath = photo.relative_path.split("/").map(encodeURIComponent).join("/");
       const imageUrl = `${photoApi}/photo/${encodeURIComponent(photo.session_id)}/${urlPath}`;
       const image = document.createElement("img");
       image.src = imageUrl;
-      image.alt = `${photo.session_name}: ${photo.name}`;
+      image.alt = "";
       image.loading = "lazy";
-      const label = document.createElement("label");
-      const checkbox = document.createElement("input");
-      checkbox.type = "checkbox";
-      checkbox.dataset.sessionId = photo.session_id;
-      checkbox.dataset.relativePath = photo.relative_path;
-      checkbox.addEventListener("change", updateDeleteButton);
-      label.append(checkbox, document.createTextNode("Select photo"));
-      const meta = document.createElement("div");
+      const meta = document.createElement("span");
       meta.className = "photo-meta";
       const name = document.createElement("span");
       name.className = "photo-name";
@@ -67,31 +73,44 @@ async function refreshPhotos() {
       const session = document.createElement("span");
       session.textContent = `${photo.session_name} · ${photo.relative_path}`;
       meta.append(name, session);
-      card.append(image, label, meta);
-      grid.append(card);
+      card.append(image, meta);
+      photoGrid.append(card);
     });
-    updateDeleteButton();
+    updatePhotoActions();
   } catch (error) {
+    if (requestId !== photoRequestId) return;
     $("#photo-summary").textContent = error.message;
     say(error.message, true);
   }
 }
 
-function updateDeleteButton() {
-  const selected = $("#photo-grid").querySelectorAll("input[type=checkbox]:checked").length;
+function updatePhotoActions() {
+  const photos = photoGrid.querySelectorAll(".photo-card");
+  const selected = photoGrid.querySelectorAll('.photo-card[aria-pressed="true"]').length;
+  togglePhotoSelection.disabled = movingPhotos || photos.length === 0;
+  togglePhotoSelection.textContent = photos.length > 0 && selected === photos.length
+    ? "Unselect all"
+    : "Select all";
   $("#delete-selected").disabled = movingPhotos || selected === 0;
   $("#delete-selected").textContent = selected ? `Move ${selected} selected to Deleted` : "Move selected to Deleted";
 }
 
 $("#session-filter").addEventListener("change", refreshPhotos);
 $("#refresh").addEventListener("click", refreshPhotos);
+togglePhotoSelection.addEventListener("click", () => {
+  const selectAll = Boolean(photoGrid.querySelector('.photo-card[aria-pressed="false"]'));
+  photoGrid.querySelectorAll(".photo-card").forEach((card) => {
+    card.setAttribute("aria-pressed", String(selectAll));
+  });
+  updatePhotoActions();
+});
 $("#delete-selected").addEventListener("click", async () => {
-  const selected = [...$("#photo-grid").querySelectorAll("input[type=checkbox]:checked")];
+  const selected = [...photoGrid.querySelectorAll('.photo-card[aria-pressed="true"]')];
   if (movingPhotos || !selected.length) return;
   movingPhotos = true;
-  updateDeleteButton();
+  updatePhotoActions();
   try {
-    const photos = selected.map((input) => ({ session_id: input.dataset.sessionId, relative_path: input.dataset.relativePath }));
+    const photos = selected.map((card) => ({ session_id: card.dataset.sessionId, relative_path: card.dataset.relativePath }));
     const result = await api(`${photoApi}/delete-photos`, { photos });
     say(`Moved ${result.moved} photo${result.moved === 1 ? "" : "s"} into Deleted. They remain in session ZIP downloads.`);
     await refreshPhotos();
@@ -99,7 +118,7 @@ $("#delete-selected").addEventListener("click", async () => {
     say(error.message, true);
   } finally {
     movingPhotos = false;
-    updateDeleteButton();
+    updatePhotoActions();
   }
 });
 
@@ -150,35 +169,41 @@ if ($("#kiosk-link")) {
   });
   pinDialog.addEventListener("close", () => { newPin = ""; });
 
-  $("#exit-kiosk").addEventListener("click", async () => {
-    if (!confirm("Close the kiosk browser and return to the desktop?")) return;
-    const button = $("#exit-kiosk");
-    button.disabled = true;
+  const systemActions = [
+    { id: "exit-kiosk", label: "Exit to desktop", description: "The kiosk browser will close and the photobooth service will keep running.", message: "Closing the kiosk browser…" },
+    { id: "reboot", label: "Restart", description: "The photobooth will be unavailable while the Raspberry Pi restarts.", message: "Raspberry Pi is restarting…" },
+    { id: "shutdown", label: "Shut down", description: "The photobooth will be unavailable until the Raspberry Pi is powered on again.", message: "Raspberry Pi is shutting down…" },
+  ];
+  const confirmation = $("#system-confirmation");
+  const confirmButton = $("#confirm-system-action");
+  const systemButtons = systemActions.map(({ id }) => document.getElementById(id));
+  let selectedAction;
+
+  systemActions.forEach((action, index) => {
+    const button = systemButtons[index];
+    button.addEventListener("click", () => {
+      selectedAction = action;
+      $("#system-confirmation-title").textContent = `${button.textContent}?`;
+      $("#system-confirmation-description").textContent = action.description;
+      confirmButton.textContent = action.label;
+      confirmButton.classList.toggle("danger", button.classList.contains("danger"));
+      confirmation.showModal();
+    });
+  });
+  confirmation.querySelector("form").addEventListener("submit", async (event) => {
+    if (event.submitter !== confirmButton) return;
+    event.preventDefault();
+    const { id, message } = selectedAction;
+    confirmation.close();
+    systemButtons.forEach((button) => { button.disabled = true; });
+    say(message);
     try {
-      await api("/api/local-admin/exit-kiosk", {});
+      await api(`/api/local-admin/${id}`, {});
     } catch (error) {
       say(error.message, true);
-      button.disabled = false;
+      systemButtons.forEach((button) => { button.disabled = false; });
     }
   });
-
-  const powerActions = [
-    ["reboot", "Restart the Raspberry Pi now? The photobooth will be unavailable while it restarts.", "Raspberry Pi is restarting…"],
-    ["shutdown", "Shut down the Raspberry Pi now? The photobooth will be unavailable until it is powered on again.", "Raspberry Pi is shutting down…"],
-  ];
-  for (const [action, prompt, message] of powerActions) {
-    $(`#${action}`).addEventListener("click", async () => {
-      if (!confirm(prompt)) return;
-      for (const [id] of powerActions) $(`#${id}`).disabled = true;
-      try {
-        await api(`/api/local-admin/${action}`, {});
-        say(message);
-      } catch (error) {
-        say(error.message, true);
-        for (const [id] of powerActions) $(`#${id}`).disabled = false;
-      }
-    });
-  }
 }
 
 refreshPhotos();

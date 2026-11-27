@@ -56,9 +56,9 @@ input,select{background:var(--field);border:1px solid var(--line-strong);border-
 button{border:0;border-radius:5px;background:var(--accent);color:var(--accent-ink);padding:11px 16px;font-weight:700;cursor:pointer}
 label{display:grid;gap:6px;color:var(--text-muted);min-width:min(100%,180px);flex:1}
 label input,label select{width:100%}
-#accent-form{align-items:end;margin-bottom:16px}
-#accent-form label{flex:0 1 240px}
-.settings{display:flex;gap:14px;flex-wrap:wrap}
+.settings{display:flex;gap:14px;flex-wrap:wrap;border:0;margin:0;padding:0;min-width:0;width:100%}
+#settings-pin-form{margin-top:20px;align-items:start}
+#settings-pin-form .save-feedback{flex-basis:100%}
 .muted{color:var(--text-subtle)}
 a{color:var(--accent)}
 .session-admin-list{display:grid;gap:8px}
