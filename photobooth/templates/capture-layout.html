@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en"{% if local %} class="hide-scrollbars"{% endif %}>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Capture layout · Photobooth</title>
+  <link rel="stylesheet" href="/static/appearance.css">
+  <link rel="stylesheet" href="/static/local-admin.css">
+  <link rel="stylesheet" href="/static/event-fonts.css">
+  <link rel="stylesheet" href="/static/layout-picker.css">
+  <script src="/static/appearance.js" defer></script>
+</head>
+<body>
+  <main class="wrap">
+    <header class="topbar">
+      <h1>Capture layout</h1>
+      <a class="button secondary" href="{{ '/local-admin' if local else '/admin' }}">Back to admin</a>
+    </header>
+    <form method="post">
+      <input type="hidden" name="token" value="{{ session.layout_token }}">
+      <fieldset class="layout-options">
+        <legend>Choose a layout</legend>
+        {% for key, name in layouts.items() %}
+        <label class="layout-option">
+          <img src="/static/layout-previews/{{ key }}.jpg" alt="">
+          <span><input type="radio" name="capture_layout" value="{{ key }}" required {% if config.capture_layout == key %}checked{% endif %}> {{ name }}</span>
+        </label>
+        {% endfor %}
+      </fieldset>
+      <div class="font-picker">
+        <label for="event-font">Event name font</label>
+        <select id="event-font" name="event_font">
+          {% for key, name in fonts.items() %}
+          <option value="{{ key }}" {% if config.event_font == key %}selected{% endif %}>{{ name }}</option>
+          {% endfor %}
+        </select>
+        <strong id="sample" data-font="{{ config.event_font }}"><span class="event-name">{{ event_name }}</span></strong>
+      </div>
+      <button>Save changes</button>
+      <span role="status">{{ error or ('Changes saved.' if saved else '') }}</span>
+    </form>
+  </main>
+  <script>
+    document.querySelector("#event-font").addEventListener("change", event => {
+      document.querySelector("#sample").dataset.font = event.target.value;
+    });
+  </script>
+</body>
+</html>

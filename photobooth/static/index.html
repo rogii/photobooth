@@ -8,6 +8,8 @@
   <title>Photobooth</title>
   <link rel="stylesheet" href="/static/appearance.css">
   <link rel="stylesheet" href="/static/kiosk.css">
+  <link rel="stylesheet" href="/static/capture-layouts.css">
+  <link rel="stylesheet" href="/static/event-fonts.css">
   <link rel="stylesheet" href="/static/pin-dialog.css">
 </head>
 <body>
@@ -30,8 +32,9 @@
     <footer id="event-footer" class="event-footer hidden">
       <div class="event-heading">
         <img id="footer-logo" class="footer-logo hidden" alt="">
-        <strong id="event"></strong>
+        <strong id="event" class="event-name"></strong>
       </div>
+      <p class="capture-trigger">Press the button</p>
       <div class="event-stats">
         <div class="event-stat"><strong id="capture-count">0</strong><span>CAPTURES</span></div>
         <span class="footer-divider"></span>

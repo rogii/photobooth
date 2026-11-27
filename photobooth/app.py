@@ -55,6 +55,24 @@ ACCENT_COLORS = {
     "orange": "#ffab60",
     "yellow": "#ffdf68",
 }
+CAPTURE_LAYOUTS = {
+    "side-gallery": "Side gallery",
+    "filmstrip": "Filmstrip",
+    "event-sidebar": "Event sidebar",
+    "spotlight": "Spotlight",
+    "contact-sheet": "Contact sheet",
+    "print-table": "Print table",
+}
+EVENT_FONTS = {
+    "system": "System sans",
+    "serif": "Classic serif",
+    "mono": "Monospace",
+    "cantarell": "Cantarell",
+    "comfortaa": "Comfortaa",
+    "eb-garamond": "EB Garamond",
+    "lato": "Lato",
+    "roboto-slab": "Roboto Slab",
+}
 DEFAULT_ACCENT = "green"
 FOOTER_LOGO_UPLOAD_LIMIT = 2 * 1024 * 1024
 
@@ -100,6 +118,8 @@ class PhotoboothService:
         self.config.setdefault("capture_lead_seconds", 1.2)
         self.config.setdefault("admin_pin", "1234")
         self.config.setdefault("idle_photo_wall_columns", 3)
+        self.config.setdefault("capture_layout", "side-gallery")
+        self.config.setdefault("event_font", "system")
         self.demo = demo
         self.camera_lock = threading.Lock()
         self.state_lock = threading.Lock()
@@ -686,6 +706,8 @@ class PhotoboothService:
                 "photo_number": self.photo_number,
                 "photo_total": self.photo_total,
                 "photo_wall_version": photo_wall_version,
+                "capture_layout": self.config["capture_layout"],
+                "event_font": self.config["event_font"],
                 "photo_wall_columns": photo_wall_columns,
                 "active_footer_logo": self.active_footer_logo,
                 "host_info": self.host_info(),
@@ -735,6 +757,11 @@ class PhotoboothService:
             if self.busy:
                 raise RuntimeError("Wait for the current capture to finish before changing settings")
             config = self.config.copy()
+            for key, choices in (("capture_layout", CAPTURE_LAYOUTS), ("event_font", EVENT_FONTS)):
+                if key in values:
+                    if not isinstance(values[key], str) or values[key] not in choices:
+                        raise ValueError("Choose an available layout and font")
+                    config[key] = values[key]
             for key, (low, high, cast) in allowed.items():
                 if key in values:
                     config[key] = max(low, min(high, cast(values[key])))
@@ -1471,11 +1498,12 @@ def create_app(service, admin_port=ADMIN_PORT):
         regular_admin.update({"admin_selfie_button", "admin_footer_logos", "admin_activate_footer_logo", "admin_remove_footer_logo", "admin_photos_page", "admin_photos", "admin_photo", "admin_delete_photos", "admin_shutdown"})
         regular_admin.update({"admin_wifi_scan", "admin_wifi_connect"})
         local_admin.update({"local_admin_wifi_page", "local_admin_wifi_status", "local_admin_wifi_scan", "local_admin_wifi_connect"})
-        local_admin.add("local_admin_bluetooth_remote")
+        regular_admin.add("admin_layout")
+        local_admin.update({"local_admin_bluetooth_remote", "local_admin_layout"})
         if request.endpoint in regular_admin and int(request.environ.get("SERVER_PORT", 0)) != admin_port:
             return jsonify({"error": f"Open the admin interface on port {admin_port}"}), 404
         if request.endpoint in local_admin and not session.get("admin_unlocked"):
-            if request.endpoint in {"local_admin_page", "local_admin_wifi_page"}:
+            if request.endpoint in {"local_admin_page", "local_admin_wifi_page", "local_admin_layout"}:
                 kiosk_url = request.url_root.replace(f":{admin_port}/", ":8080/")
                 return redirect(kiosk_url)
             return jsonify({"error": "Admin PIN required"}), 401
@@ -1509,6 +1537,27 @@ def create_app(service, admin_port=ADMIN_PORT):
     @web.get("/local-admin/wifi")
     def local_admin_wifi_page():
         return render_template("local-admin-wifi.html")
+
+    @web.route("/admin/layout", methods=["GET", "POST"], endpoint="admin_layout")
+    @web.route("/local-admin/layout", methods=["GET", "POST"], endpoint="local_admin_layout")
+    def capture_layout_page():
+        error = ""
+        if request.method == "POST":
+            if request.form.get("token") != session.get("layout_token") or "layout_token" not in session:
+                return "Reopen the layout picker and try again.", 403
+            try:
+                service.update_config({key: request.form.get(key) for key in ("capture_layout", "event_font")})
+                return redirect(request.path + "?saved=1", code=303)
+            except (ValueError, RuntimeError) as exc:
+                error = str(exc)
+        if "layout_token" not in session:
+            session["layout_token"] = uuid.uuid4().hex
+        return render_template(
+            "capture-layout.html", local=request.endpoint == "local_admin_layout",
+            layouts=CAPTURE_LAYOUTS, fonts=EVENT_FONTS, config=service.config,
+            event_name=(service.session or {}).get("name") or "Winter Social",
+            error=error, saved=request.args.get("saved") == "1",
+        ), 400 if error else 200
 
     @web.get("/admin/captures")
     def admin_photos_page():
@@ -1836,7 +1885,7 @@ def create_app(service, admin_port=ADMIN_PORT):
     @web.get("/api/state")
     def get_state():
         state = service.state()
-        public = {key: state[key] for key in ("session", "busy", "status", "countdown", "prepare_elapsed", "prepare_estimate", "photo_number", "photo_total", "recent_photo", "recent_photo_version", "result_duration_seconds", "result_remaining_seconds", "phase", "photo_wall_version", "photo_wall_columns", "active_footer_logo", "capture_count", "queued_uploads", "gallery_upload_configured", "sessions", "locked_session", "host_info", "camera_available", "camera_error", "selfie_button_status")}
+        public = {key: state[key] for key in ("session", "busy", "status", "countdown", "prepare_elapsed", "prepare_estimate", "photo_number", "photo_total", "recent_photo", "recent_photo_version", "result_duration_seconds", "result_remaining_seconds", "phase", "photo_wall_version", "photo_wall_columns", "capture_layout", "event_font", "active_footer_logo", "capture_count", "queued_uploads", "gallery_upload_configured", "sessions", "locked_session", "host_info", "camera_available", "camera_error", "selfie_button_status")}
         public["server_instance_id"] = SERVER_INSTANCE_ID
         public["selfie_button_configured"] = state["selfie_button_configured"]
         public["admin_pin_length"] = len(str(service.config.get("admin_pin", "1234")))
