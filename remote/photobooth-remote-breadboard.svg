@@ -1,0 +1,826 @@
+<?xml version='1.0' encoding='utf-8'?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1110 929" width="1110" height="929" role="img" aria-labelledby="title desc">
+  <title id="title">Photobooth remote breadboard wiring</title>
+  <desc id="desc">A 30-column solderless breadboard with a XIAO nRF52840, two IRLZ44NPBF lamp switches, a red status LED and off-board power modules and arcade buttons.</desc>
+  <rect x="0" y="0" width="1110" height="929" fill="#fff" stroke="none" rx="0" />
+  <g font-family="Arial, sans-serif">
+    <text x="30" y="36" fill="#172637" font-size="25" font-weight="700" text-anchor="start">Photobooth remote</text>
+    <text x="30" y="59" fill="#415267" font-size="14" font-weight="400" text-anchor="start">Breadboard wiring • 12 V USB-C PD with 5 V buck</text>
+    <polyline points="30,82 50,82" fill="none" stroke="#bb292b" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" />
+    <text x="57" y="87" fill="#172637" font-size="12" font-weight="400" text-anchor="start">12 V</text>
+    <polyline points="107,82 127,82" fill="none" stroke="#b35408" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" />
+    <text x="134" y="87" fill="#172637" font-size="12" font-weight="400" text-anchor="start">5 V</text>
+    <polyline points="180,82 200,82" fill="none" stroke="#26313e" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" />
+    <text x="207" y="87" fill="#172637" font-size="12" font-weight="400" text-anchor="start">GND</text>
+    <polyline points="259,82 279,82" fill="none" stroke="#146397" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" />
+    <text x="286" y="87" fill="#172637" font-size="12" font-weight="400" text-anchor="start">GPIO</text>
+    <polyline points="346,82 366,82" fill="none" stroke="#72439a" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" />
+    <text x="373" y="87" fill="#172637" font-size="12" font-weight="400" text-anchor="start">Lamp return</text>
+    <polyline points="479,82 499,82" fill="none" stroke="#197258" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" />
+    <text x="506" y="87" fill="#172637" font-size="12" font-weight="400" text-anchor="start">OFF switch</text>
+    <g id="breadboard">
+      <rect x="126" y="310" width="837" height="435" fill="#f3f2ed" stroke="#9ca7ae" rx="14" stroke-width="2" />
+      <rect x="144" y="499" width="800" height="54" fill="#e4e2db" stroke="#d2d3cd" rx="6" />
+      <text x="154" y="526" fill="#63717a" font-size="10" font-weight="700" text-anchor="start">CENTER GAP</text>
+      <polyline points="175,330 930,330" fill="none" stroke="#bb292b" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round" opacity=".48" />
+      <text x="138" y="323" fill="#bb292b" font-size="10" font-weight="700" text-anchor="start">+12 V</text>
+      <text x="952" y="334" fill="#bb292b" font-size="13" font-weight="700" text-anchor="middle">+</text>
+      <rect x="189" y="327" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="215" y="327" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="241" y="327" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="267" y="327" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="293" y="327" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="345" y="327" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="371" y="327" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="397" y="327" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="423" y="327" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="449" y="327" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="501" y="327" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="527" y="327" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="553" y="327" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="579" y="327" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="605" y="327" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="657" y="327" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="683" y="327" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="709" y="327" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="735" y="327" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="761" y="327" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="787" y="327" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="813" y="327" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="839" y="327" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="865" y="327" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="891" y="327" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <polyline points="175,351 930,351" fill="none" stroke="#26313e" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round" opacity=".48" />
+      <text x="138" y="355" fill="#26313e" font-size="10" font-weight="700" text-anchor="start">GND</text>
+      <text x="952" y="355" fill="#26313e" font-size="13" font-weight="700" text-anchor="middle">−</text>
+      <rect x="189" y="348" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="215" y="348" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="241" y="348" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="267" y="348" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="293" y="348" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="345" y="348" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="371" y="348" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="397" y="348" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="423" y="348" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="449" y="348" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="501" y="348" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="527" y="348" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="553" y="348" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="579" y="348" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="605" y="348" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="657" y="348" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="683" y="348" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="709" y="348" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="735" y="348" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="761" y="348" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="787" y="348" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="813" y="348" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="839" y="348" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="865" y="348" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="891" y="348" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <polyline points="175,704 930,704" fill="none" stroke="#b35408" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round" opacity=".48" />
+      <text x="138" y="697" fill="#b35408" font-size="10" font-weight="700" text-anchor="start">+5 V</text>
+      <text x="952" y="708" fill="#b35408" font-size="13" font-weight="700" text-anchor="middle">+</text>
+      <rect x="189" y="701" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="215" y="701" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="241" y="701" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="267" y="701" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="293" y="701" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="345" y="701" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="371" y="701" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="397" y="701" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="423" y="701" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="449" y="701" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="501" y="701" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="527" y="701" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="553" y="701" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="579" y="701" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="605" y="701" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="657" y="701" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="683" y="701" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="709" y="701" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="735" y="701" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="761" y="701" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="787" y="701" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="813" y="701" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="839" y="701" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="865" y="701" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="891" y="701" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <polyline points="175,725 930,725" fill="none" stroke="#26313e" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round" opacity=".48" />
+      <text x="138" y="729" fill="#26313e" font-size="10" font-weight="700" text-anchor="start">GND</text>
+      <text x="952" y="729" fill="#26313e" font-size="13" font-weight="700" text-anchor="middle">−</text>
+      <rect x="189" y="722" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="215" y="722" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="241" y="722" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="267" y="722" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="293" y="722" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="345" y="722" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="371" y="722" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="397" y="722" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="423" y="722" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="449" y="722" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="501" y="722" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="527" y="722" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="553" y="722" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="579" y="722" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="605" y="722" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="657" y="722" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="683" y="722" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="709" y="722" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="735" y="722" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="761" y="722" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="787" y="722" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="813" y="722" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="839" y="722" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="865" y="722" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="891" y="722" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <text x="145" y="386" fill="#415267" font-size="10" font-weight="400" text-anchor="middle">A</text>
+      <text x="947" y="386" fill="#415267" font-size="10" font-weight="400" text-anchor="middle">A</text>
+      <rect x="163" y="379" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="189" y="379" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="215" y="379" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="241" y="379" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="267" y="379" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="293" y="379" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="319" y="379" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="345" y="379" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="371" y="379" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="397" y="379" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="423" y="379" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="449" y="379" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="475" y="379" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="501" y="379" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="527" y="379" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="553" y="379" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="579" y="379" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="605" y="379" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="631" y="379" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="657" y="379" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="683" y="379" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="709" y="379" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="735" y="379" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="761" y="379" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="787" y="379" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="813" y="379" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="839" y="379" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="865" y="379" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="891" y="379" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="917" y="379" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <text x="145" y="412" fill="#415267" font-size="10" font-weight="400" text-anchor="middle">B</text>
+      <text x="947" y="412" fill="#415267" font-size="10" font-weight="400" text-anchor="middle">B</text>
+      <rect x="163" y="405" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="189" y="405" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="215" y="405" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="241" y="405" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="267" y="405" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="293" y="405" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="319" y="405" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="345" y="405" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="371" y="405" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="397" y="405" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="423" y="405" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="449" y="405" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="475" y="405" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="501" y="405" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="527" y="405" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="553" y="405" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="579" y="405" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="605" y="405" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="631" y="405" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="657" y="405" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="683" y="405" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="709" y="405" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="735" y="405" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="761" y="405" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="787" y="405" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="813" y="405" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="839" y="405" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="865" y="405" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="891" y="405" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="917" y="405" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <text x="145" y="438" fill="#415267" font-size="10" font-weight="400" text-anchor="middle">C</text>
+      <text x="947" y="438" fill="#415267" font-size="10" font-weight="400" text-anchor="middle">C</text>
+      <rect x="163" y="431" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="189" y="431" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="215" y="431" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="241" y="431" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="267" y="431" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="293" y="431" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="319" y="431" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="345" y="431" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="371" y="431" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="397" y="431" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="423" y="431" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="449" y="431" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="475" y="431" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="501" y="431" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="527" y="431" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="553" y="431" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="579" y="431" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="605" y="431" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="631" y="431" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="657" y="431" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="683" y="431" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="709" y="431" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="735" y="431" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="761" y="431" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="787" y="431" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="813" y="431" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="839" y="431" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="865" y="431" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="891" y="431" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="917" y="431" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <text x="145" y="464" fill="#415267" font-size="10" font-weight="400" text-anchor="middle">D</text>
+      <text x="947" y="464" fill="#415267" font-size="10" font-weight="400" text-anchor="middle">D</text>
+      <rect x="163" y="457" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="189" y="457" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="215" y="457" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="241" y="457" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="267" y="457" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="293" y="457" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="319" y="457" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="345" y="457" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="371" y="457" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="397" y="457" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="423" y="457" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="449" y="457" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="475" y="457" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="501" y="457" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="527" y="457" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="553" y="457" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="579" y="457" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="605" y="457" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="631" y="457" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="657" y="457" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="683" y="457" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="709" y="457" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="735" y="457" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="761" y="457" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="787" y="457" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="813" y="457" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="839" y="457" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="865" y="457" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="891" y="457" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="917" y="457" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <text x="145" y="490" fill="#415267" font-size="10" font-weight="400" text-anchor="middle">E</text>
+      <text x="947" y="490" fill="#415267" font-size="10" font-weight="400" text-anchor="middle">E</text>
+      <rect x="163" y="483" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="189" y="483" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="215" y="483" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="241" y="483" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="267" y="483" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="293" y="483" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="319" y="483" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="345" y="483" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="371" y="483" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="397" y="483" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="423" y="483" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="449" y="483" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="475" y="483" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="501" y="483" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="527" y="483" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="553" y="483" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="579" y="483" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="605" y="483" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="631" y="483" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="657" y="483" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="683" y="483" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="709" y="483" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="735" y="483" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="761" y="483" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="787" y="483" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="813" y="483" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="839" y="483" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="865" y="483" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="891" y="483" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="917" y="483" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <text x="145" y="568" fill="#415267" font-size="10" font-weight="400" text-anchor="middle">F</text>
+      <text x="947" y="568" fill="#415267" font-size="10" font-weight="400" text-anchor="middle">F</text>
+      <rect x="163" y="561" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="189" y="561" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="215" y="561" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="241" y="561" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="267" y="561" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="293" y="561" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="319" y="561" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="345" y="561" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="371" y="561" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="397" y="561" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="423" y="561" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="449" y="561" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="475" y="561" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="501" y="561" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="527" y="561" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="553" y="561" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="579" y="561" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="605" y="561" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="631" y="561" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="657" y="561" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="683" y="561" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="709" y="561" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="735" y="561" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="761" y="561" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="787" y="561" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="813" y="561" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="839" y="561" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="865" y="561" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="891" y="561" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="917" y="561" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <text x="145" y="594" fill="#415267" font-size="10" font-weight="400" text-anchor="middle">G</text>
+      <text x="947" y="594" fill="#415267" font-size="10" font-weight="400" text-anchor="middle">G</text>
+      <rect x="163" y="587" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="189" y="587" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="215" y="587" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="241" y="587" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="267" y="587" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="293" y="587" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="319" y="587" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="345" y="587" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="371" y="587" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="397" y="587" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="423" y="587" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="449" y="587" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="475" y="587" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="501" y="587" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="527" y="587" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="553" y="587" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="579" y="587" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="605" y="587" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="631" y="587" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="657" y="587" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="683" y="587" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="709" y="587" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="735" y="587" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="761" y="587" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="787" y="587" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="813" y="587" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="839" y="587" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="865" y="587" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="891" y="587" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="917" y="587" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <text x="145" y="620" fill="#415267" font-size="10" font-weight="400" text-anchor="middle">H</text>
+      <text x="947" y="620" fill="#415267" font-size="10" font-weight="400" text-anchor="middle">H</text>
+      <rect x="163" y="613" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="189" y="613" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="215" y="613" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="241" y="613" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="267" y="613" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="293" y="613" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="319" y="613" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="345" y="613" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="371" y="613" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="397" y="613" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="423" y="613" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="449" y="613" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="475" y="613" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="501" y="613" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="527" y="613" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="553" y="613" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="579" y="613" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="605" y="613" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="631" y="613" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="657" y="613" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="683" y="613" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="709" y="613" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="735" y="613" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="761" y="613" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="787" y="613" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="813" y="613" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="839" y="613" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="865" y="613" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="891" y="613" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="917" y="613" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <text x="145" y="646" fill="#415267" font-size="10" font-weight="400" text-anchor="middle">I</text>
+      <text x="947" y="646" fill="#415267" font-size="10" font-weight="400" text-anchor="middle">I</text>
+      <rect x="163" y="639" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="189" y="639" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="215" y="639" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="241" y="639" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="267" y="639" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="293" y="639" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="319" y="639" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="345" y="639" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="371" y="639" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="397" y="639" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="423" y="639" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="449" y="639" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="475" y="639" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="501" y="639" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="527" y="639" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="553" y="639" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="579" y="639" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="605" y="639" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="631" y="639" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="657" y="639" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="683" y="639" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="709" y="639" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="735" y="639" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="761" y="639" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="787" y="639" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="813" y="639" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="839" y="639" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="865" y="639" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="891" y="639" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="917" y="639" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <text x="145" y="672" fill="#415267" font-size="10" font-weight="400" text-anchor="middle">J</text>
+      <text x="947" y="672" fill="#415267" font-size="10" font-weight="400" text-anchor="middle">J</text>
+      <rect x="163" y="665" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="189" y="665" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="215" y="665" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="241" y="665" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="267" y="665" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="293" y="665" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="319" y="665" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="345" y="665" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="371" y="665" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="397" y="665" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="423" y="665" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="449" y="665" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="475" y="665" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="501" y="665" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="527" y="665" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="553" y="665" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="579" y="665" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="605" y="665" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="631" y="665" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="657" y="665" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="683" y="665" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="709" y="665" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="735" y="665" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="761" y="665" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="787" y="665" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="813" y="665" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="839" y="665" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="865" y="665" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="891" y="665" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <rect x="917" y="665" width="6" height="6" fill="#737a7e" stroke="none" rx="1" />
+      <text x="166" y="372" fill="#415267" font-size="9" font-weight="400" text-anchor="middle">1</text>
+      <text x="166" y="688" fill="#415267" font-size="9" font-weight="400" text-anchor="middle">1</text>
+      <text x="270" y="372" fill="#415267" font-size="9" font-weight="400" text-anchor="middle">5</text>
+      <text x="270" y="688" fill="#415267" font-size="9" font-weight="400" text-anchor="middle">5</text>
+      <text x="400" y="372" fill="#415267" font-size="9" font-weight="400" text-anchor="middle">10</text>
+      <text x="400" y="688" fill="#415267" font-size="9" font-weight="400" text-anchor="middle">10</text>
+      <text x="530" y="372" fill="#415267" font-size="9" font-weight="400" text-anchor="middle">15</text>
+      <text x="530" y="688" fill="#415267" font-size="9" font-weight="400" text-anchor="middle">15</text>
+      <text x="660" y="372" fill="#415267" font-size="9" font-weight="400" text-anchor="middle">20</text>
+      <text x="660" y="688" fill="#415267" font-size="9" font-weight="400" text-anchor="middle">20</text>
+      <text x="790" y="372" fill="#415267" font-size="9" font-weight="400" text-anchor="middle">25</text>
+      <text x="790" y="688" fill="#415267" font-size="9" font-weight="400" text-anchor="middle">25</text>
+      <text x="920" y="372" fill="#415267" font-size="9" font-weight="400" text-anchor="middle">30</text>
+      <text x="920" y="688" fill="#415267" font-size="9" font-weight="400" text-anchor="middle">30</text>
+    </g>
+    <g id="wires">
+      <polyline points="278,229 278,302 244,302 244,351" fill="none" stroke="#fff" stroke-width="6" stroke-linecap="round" stroke-linejoin="round" />
+      <polyline points="278,229 278,302 244,302 244,351" fill="none" stroke="#26313e" stroke-width="3.3" stroke-linecap="round" stroke-linejoin="round" />
+      <polyline points="313,229 313,247 447,247 447,170 475,170" fill="none" stroke="#fff" stroke-width="6" stroke-linecap="round" stroke-linejoin="round" />
+      <polyline points="313,229 313,247 447,247 447,170 475,170" fill="none" stroke="#bb292b" stroke-width="3.3" stroke-linecap="round" stroke-linejoin="round" />
+      <polyline points="613,170 632,170 632,244 452,244 452,330" fill="none" stroke="#fff" stroke-width="6" stroke-linecap="round" stroke-linejoin="round" />
+      <polyline points="613,170 632,170 632,244 452,244 452,330" fill="none" stroke="#bb292b" stroke-width="3.3" stroke-linecap="round" stroke-linejoin="round" />
+      <polyline points="704,211 704,271 660,271 660,330" fill="none" stroke="#fff" stroke-width="6" stroke-linecap="round" stroke-linejoin="round" />
+      <polyline points="704,211 704,271 660,271 660,330" fill="none" stroke="#bb292b" stroke-width="3.3" stroke-linecap="round" stroke-linejoin="round" />
+      <polyline points="751,211 751,285 712,285 712,351" fill="none" stroke="#fff" stroke-width="6" stroke-linecap="round" stroke-linejoin="round" />
+      <polyline points="751,211 751,285 712,285 712,351" fill="none" stroke="#26313e" stroke-width="3.3" stroke-linecap="round" stroke-linejoin="round" />
+      <polyline points="799,211 799,234 910,234 910,169 944,169" fill="none" stroke="#fff" stroke-width="6" stroke-linecap="round" stroke-linejoin="round" />
+      <polyline points="799,211 799,234 910,234 910,169 944,169" fill="none" stroke="#b35408" stroke-width="3.3" stroke-linecap="round" stroke-linejoin="round" />
+      <polyline points="1075,169 1092,169 1092,754 816,754 816,704" fill="none" stroke="#fff" stroke-width="6" stroke-linecap="round" stroke-linejoin="round" />
+      <polyline points="1075,169 1092,169 1092,754 816,754 816,704" fill="none" stroke="#b35408" stroke-width="3.3" stroke-linecap="round" stroke-linejoin="round" />
+      <polyline points="376,229 376,267 222,267 222,257 193,257" fill="none" stroke="#fff" stroke-width="6" stroke-linecap="round" stroke-linejoin="round" />
+      <polyline points="376,229 376,267 222,267 222,257 193,257" fill="none" stroke="#197258" stroke-width="3.3" stroke-linecap="round" stroke-linejoin="round" />
+      <polyline points="403,229 403,281 193,281" fill="none" stroke="#fff" stroke-width="6" stroke-linecap="round" stroke-linejoin="round" />
+      <polyline points="403,229 403,281 193,281" fill="none" stroke="#197258" stroke-width="3.3" stroke-linecap="round" stroke-linejoin="round" />
+      <polyline points="868,351 981,351 981,725 868,725" fill="none" stroke="#fff" stroke-width="6" stroke-linecap="round" stroke-linejoin="round" />
+      <polyline points="868,351 981,351 981,725 868,725" fill="none" stroke="#26313e" stroke-width="3.3" stroke-linecap="round" stroke-linejoin="round" />
+      <polyline points="270,382 270,369 124,369 124,704 218,704" fill="none" stroke="#fff" stroke-width="6" stroke-linecap="round" stroke-linejoin="round" />
+      <polyline points="270,382 270,369 124,369 124,704 218,704" fill="none" stroke="#b35408" stroke-width="3.3" stroke-linecap="round" stroke-linejoin="round" />
+      <polyline points="296,382 296,351" fill="none" stroke="#fff" stroke-width="6" stroke-linecap="round" stroke-linejoin="round" />
+      <polyline points="296,382 296,351" fill="none" stroke="#26313e" stroke-width="3.3" stroke-linecap="round" stroke-linejoin="round" />
+      <polyline points="348,616 348,608 478,608 478,460" fill="none" stroke="#fff" stroke-width="6" stroke-linecap="round" stroke-linejoin="round" />
+      <polyline points="348,616 348,608 478,608 478,460" fill="none" stroke="#146397" stroke-width="3.3" stroke-linecap="round" stroke-linejoin="round" />
+      <polyline points="374,642 374,628 660,628 660,460" fill="none" stroke="#fff" stroke-width="6" stroke-linecap="round" stroke-linejoin="round" />
+      <polyline points="374,642 374,628 660,628 660,460" fill="none" stroke="#146397" stroke-width="3.3" stroke-linecap="round" stroke-linejoin="round" />
+      <polyline points="530,382 530,351" fill="none" stroke="#fff" stroke-width="6" stroke-linecap="round" stroke-linejoin="round" />
+      <polyline points="530,382 530,351" fill="none" stroke="#26313e" stroke-width="3.3" stroke-linecap="round" stroke-linejoin="round" />
+      <polyline points="686,382 686,351" fill="none" stroke="#fff" stroke-width="6" stroke-linecap="round" stroke-linejoin="round" />
+      <polyline points="686,382 686,351" fill="none" stroke="#26313e" stroke-width="3.3" stroke-linecap="round" stroke-linejoin="round" />
+      <polyline points="634,382 634,365 608,365 608,351" fill="none" stroke="#fff" stroke-width="6" stroke-linecap="round" stroke-linejoin="round" />
+      <polyline points="634,382 634,365 608,365 608,351" fill="none" stroke="#26313e" stroke-width="3.3" stroke-linecap="round" stroke-linejoin="round" />
+      <polyline points="790,382 790,351" fill="none" stroke="#fff" stroke-width="6" stroke-linecap="round" stroke-linejoin="round" />
+      <polyline points="790,382 790,351" fill="none" stroke="#26313e" stroke-width="3.3" stroke-linecap="round" stroke-linejoin="round" />
+      <polyline points="400,668 400,683 530,683 530,668" fill="none" stroke="#fff" stroke-width="6" stroke-linecap="round" stroke-linejoin="round" />
+      <polyline points="400,668 400,683 530,683 530,668" fill="none" stroke="#146397" stroke-width="3.3" stroke-linecap="round" stroke-linejoin="round" />
+      <polyline points="738,668 738,725" fill="none" stroke="#fff" stroke-width="6" stroke-linecap="round" stroke-linejoin="round" />
+      <polyline points="738,668 738,725" fill="none" stroke="#26313e" stroke-width="3.3" stroke-linecap="round" stroke-linejoin="round" />
+      <polyline points="296,668 296,781 160,781 160,825" fill="none" stroke="#fff" stroke-width="6" stroke-linecap="round" stroke-linejoin="round" />
+      <polyline points="296,668 296,781 160,781 160,825" fill="none" stroke="#146397" stroke-width="3.3" stroke-linecap="round" stroke-linejoin="round" />
+      <polyline points="322,668 322,767 728,767 728,825" fill="none" stroke="#fff" stroke-width="6" stroke-linecap="round" stroke-linejoin="round" />
+      <polyline points="322,668 322,767 728,767 728,825" fill="none" stroke="#146397" stroke-width="3.3" stroke-linecap="round" stroke-linejoin="round" />
+      <polyline points="270,725 270,796 212,796 212,825" fill="none" stroke="#fff" stroke-width="6" stroke-linecap="round" stroke-linejoin="round" />
+      <polyline points="270,725 270,796 212,796 212,825" fill="none" stroke="#26313e" stroke-width="3.3" stroke-linecap="round" stroke-linejoin="round" />
+      <polyline points="842,725 842,796 780,796 780,825" fill="none" stroke="#fff" stroke-width="6" stroke-linecap="round" stroke-linejoin="round" />
+      <polyline points="842,725 842,796 780,796 780,825" fill="none" stroke="#26313e" stroke-width="3.3" stroke-linecap="round" stroke-linejoin="round" />
+      <polyline points="192,330 104,330 104,807 267,807 267,825" fill="none" stroke="#fff" stroke-width="6" stroke-linecap="round" stroke-linejoin="round" />
+      <polyline points="192,330 104,330 104,807 267,807 267,825" fill="none" stroke="#bb292b" stroke-width="3.3" stroke-linecap="round" stroke-linejoin="round" />
+      <polyline points="894,330 1009,330 1009,784 835,784 835,825" fill="none" stroke="#fff" stroke-width="6" stroke-linecap="round" stroke-linejoin="round" />
+      <polyline points="894,330 1009,330 1009,784 835,784 835,825" fill="none" stroke="#bb292b" stroke-width="3.3" stroke-linecap="round" stroke-linejoin="round" />
+      <polyline points="608,460 608,460 608,535 577,535 577,810 311,810 311,825" fill="none" stroke="#fff" stroke-width="6" stroke-linecap="round" stroke-linejoin="round" />
+      <polyline points="608,460 608,460 608,535 577,535 577,810 311,810 311,825" fill="none" stroke="#72439a" stroke-width="3.3" stroke-linecap="round" stroke-linejoin="round" />
+      <polyline points="764,460 764,460 764,535 794,535 794,809 879,809 879,825" fill="none" stroke="#fff" stroke-width="6" stroke-linecap="round" stroke-linejoin="round" />
+      <polyline points="764,460 764,460 764,535 794,535 794,809 879,809 879,825" fill="none" stroke="#72439a" stroke-width="3.3" stroke-linecap="round" stroke-linejoin="round" />
+    </g>
+    <g id="wire-ends">
+      <circle cx="278" cy="229" r="4.3" fill="#26313e" stroke="#fff" stroke-width="1" />
+      <circle cx="244" cy="351" r="4.3" fill="#26313e" stroke="#fff" stroke-width="1" />
+      <circle cx="313" cy="229" r="4.3" fill="#bb292b" stroke="#fff" stroke-width="1" />
+      <circle cx="475" cy="170" r="4.3" fill="#bb292b" stroke="#fff" stroke-width="1" />
+      <circle cx="613" cy="170" r="4.3" fill="#bb292b" stroke="#fff" stroke-width="1" />
+      <circle cx="452" cy="330" r="4.3" fill="#bb292b" stroke="#fff" stroke-width="1" />
+      <circle cx="704" cy="211" r="4.3" fill="#bb292b" stroke="#fff" stroke-width="1" />
+      <circle cx="660" cy="330" r="4.3" fill="#bb292b" stroke="#fff" stroke-width="1" />
+      <circle cx="751" cy="211" r="4.3" fill="#26313e" stroke="#fff" stroke-width="1" />
+      <circle cx="712" cy="351" r="4.3" fill="#26313e" stroke="#fff" stroke-width="1" />
+      <circle cx="799" cy="211" r="4.3" fill="#b35408" stroke="#fff" stroke-width="1" />
+      <circle cx="944" cy="169" r="4.3" fill="#b35408" stroke="#fff" stroke-width="1" />
+      <circle cx="1075" cy="169" r="4.3" fill="#b35408" stroke="#fff" stroke-width="1" />
+      <circle cx="816" cy="704" r="4.3" fill="#b35408" stroke="#fff" stroke-width="1" />
+      <circle cx="376" cy="229" r="4.3" fill="#197258" stroke="#fff" stroke-width="1" />
+      <circle cx="193" cy="257" r="4.3" fill="#197258" stroke="#fff" stroke-width="1" />
+      <circle cx="403" cy="229" r="4.3" fill="#197258" stroke="#fff" stroke-width="1" />
+      <circle cx="193" cy="281" r="4.3" fill="#197258" stroke="#fff" stroke-width="1" />
+      <circle cx="868" cy="351" r="4.3" fill="#26313e" stroke="#fff" stroke-width="1" />
+      <circle cx="868" cy="725" r="4.3" fill="#26313e" stroke="#fff" stroke-width="1" />
+      <circle cx="270" cy="382" r="4.3" fill="#b35408" stroke="#fff" stroke-width="1" />
+      <circle cx="218" cy="704" r="4.3" fill="#b35408" stroke="#fff" stroke-width="1" />
+      <circle cx="296" cy="382" r="4.3" fill="#26313e" stroke="#fff" stroke-width="1" />
+      <circle cx="296" cy="351" r="4.3" fill="#26313e" stroke="#fff" stroke-width="1" />
+      <circle cx="348" cy="616" r="4.3" fill="#146397" stroke="#fff" stroke-width="1" />
+      <circle cx="478" cy="460" r="4.3" fill="#146397" stroke="#fff" stroke-width="1" />
+      <circle cx="374" cy="642" r="4.3" fill="#146397" stroke="#fff" stroke-width="1" />
+      <circle cx="660" cy="460" r="4.3" fill="#146397" stroke="#fff" stroke-width="1" />
+      <circle cx="530" cy="382" r="4.3" fill="#26313e" stroke="#fff" stroke-width="1" />
+      <circle cx="530" cy="351" r="4.3" fill="#26313e" stroke="#fff" stroke-width="1" />
+      <circle cx="686" cy="382" r="4.3" fill="#26313e" stroke="#fff" stroke-width="1" />
+      <circle cx="686" cy="351" r="4.3" fill="#26313e" stroke="#fff" stroke-width="1" />
+      <circle cx="634" cy="382" r="4.3" fill="#26313e" stroke="#fff" stroke-width="1" />
+      <circle cx="608" cy="351" r="4.3" fill="#26313e" stroke="#fff" stroke-width="1" />
+      <circle cx="790" cy="382" r="4.3" fill="#26313e" stroke="#fff" stroke-width="1" />
+      <circle cx="790" cy="351" r="4.3" fill="#26313e" stroke="#fff" stroke-width="1" />
+      <circle cx="400" cy="668" r="4.3" fill="#146397" stroke="#fff" stroke-width="1" />
+      <circle cx="530" cy="668" r="4.3" fill="#146397" stroke="#fff" stroke-width="1" />
+      <circle cx="738" cy="668" r="4.3" fill="#26313e" stroke="#fff" stroke-width="1" />
+      <circle cx="738" cy="725" r="4.3" fill="#26313e" stroke="#fff" stroke-width="1" />
+      <circle cx="296" cy="668" r="4.3" fill="#146397" stroke="#fff" stroke-width="1" />
+      <circle cx="160" cy="825" r="4.3" fill="#146397" stroke="#fff" stroke-width="1" />
+      <circle cx="322" cy="668" r="4.3" fill="#146397" stroke="#fff" stroke-width="1" />
+      <circle cx="728" cy="825" r="4.3" fill="#146397" stroke="#fff" stroke-width="1" />
+      <circle cx="270" cy="725" r="4.3" fill="#26313e" stroke="#fff" stroke-width="1" />
+      <circle cx="212" cy="825" r="4.3" fill="#26313e" stroke="#fff" stroke-width="1" />
+      <circle cx="842" cy="725" r="4.3" fill="#26313e" stroke="#fff" stroke-width="1" />
+      <circle cx="780" cy="825" r="4.3" fill="#26313e" stroke="#fff" stroke-width="1" />
+      <circle cx="192" cy="330" r="4.3" fill="#bb292b" stroke="#fff" stroke-width="1" />
+      <circle cx="267" cy="825" r="4.3" fill="#bb292b" stroke="#fff" stroke-width="1" />
+      <circle cx="894" cy="330" r="4.3" fill="#bb292b" stroke="#fff" stroke-width="1" />
+      <circle cx="835" cy="825" r="4.3" fill="#bb292b" stroke="#fff" stroke-width="1" />
+      <circle cx="608" cy="460" r="4.3" fill="#72439a" stroke="#fff" stroke-width="1" />
+      <circle cx="311" cy="825" r="4.3" fill="#72439a" stroke="#fff" stroke-width="1" />
+      <circle cx="764" cy="460" r="4.3" fill="#72439a" stroke="#fff" stroke-width="1" />
+      <circle cx="879" cy="825" r="4.3" fill="#72439a" stroke="#fff" stroke-width="1" />
+    </g>
+    <g id="components">
+      <g>
+        <rect x="30" y="120" width="160" height="96" fill="#eef2f5" stroke="#688295" rx="10" stroke-width="1.5" />
+        <text x="43" y="142" fill="#172637" font-size="15" font-weight="700" text-anchor="start">USB-C power bank</text>
+        <text x="43" y="160" fill="#415267" font-size="11" font-weight="400" text-anchor="start">Fixed 12 V PD profile</text>
+        <rect x="39" y="176" width="104" height="17" fill="#d6dde1" stroke="#adbbc2" rx="4" />
+        <circle cx="51" cy="184" r="2" fill="#6e956e" stroke="none" />
+        <circle cx="61" cy="184" r="2" fill="#6e956e" stroke="none" />
+        <circle cx="71" cy="184" r="2" fill="#6e956e" stroke="none" />
+        <circle cx="81" cy="184" r="2" fill="#6e956e" stroke="none" />
+        <rect x="171" y="165" width="22" height="15" fill="#4a5e71" stroke="#203040" rx="4" />
+      </g>
+      <g>
+        <rect x="250" y="111" width="177" height="118" fill="#dceaf7" stroke="#688295" rx="10" stroke-width="1.5" />
+        <text x="263" y="133" fill="#172637" font-size="15" font-weight="700" text-anchor="start">U1 • HUSB238</text>
+        <text x="263" y="151" fill="#415267" font-size="11" font-weight="400" text-anchor="start">12V switch on</text>
+        <rect x="245" y="163" width="16" height="18" fill="#667988" stroke="#283a49" rx="3" />
+        <circle cx="278" cy="229" r="5.5" fill="#d0d9df" stroke="#2c4051" stroke-width="1.2" />
+        <text x="278" y="218" fill="#172637" font-size="11" font-weight="700" text-anchor="middle">OUT−</text>
+        <circle cx="313" cy="229" r="5.5" fill="#d0d9df" stroke="#2c4051" stroke-width="1.2" />
+        <text x="313" y="218" fill="#172637" font-size="11" font-weight="700" text-anchor="middle">OUT+</text>
+        <circle cx="376" cy="229" r="5.5" fill="#d0d9df" stroke="#2c4051" stroke-width="1.2" />
+        <text x="376" y="218" fill="#172637" font-size="11" font-weight="700" text-anchor="middle">OFF</text>
+        <circle cx="403" cy="229" r="5.5" fill="#d0d9df" stroke="#2c4051" stroke-width="1.2" />
+        <text x="403" y="218" fill="#172637" font-size="11" font-weight="700" text-anchor="middle">OFF</text>
+      </g>
+      <polyline points="191,172 246,172" fill="none" stroke="#536474" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" />
+      <g>
+        <rect x="54" y="246" width="139" height="48" fill="#eef4f8" stroke="#688295" rx="10" stroke-width="1.5" />
+        <text x="67" y="268" fill="#172637" font-size="15" font-weight="700" text-anchor="start">SW3 • SPST</text>
+        <text x="67" y="286" fill="#415267" font-size="10" font-weight="400" text-anchor="start">Close to turn off</text>
+        <circle cx="193" cy="257" r="5.5" fill="#d0d9df" stroke="#2c4051" stroke-width="1.2" />
+        <circle cx="193" cy="281" r="5.5" fill="#d0d9df" stroke="#2c4051" stroke-width="1.2" />
+      </g>
+      <g>
+        <rect x="475" y="130" width="138" height="60" fill="#eef4f8" stroke="#688295" rx="10" stroke-width="1.5" />
+        <text x="488" y="152" fill="#172637" font-size="15" font-weight="700" text-anchor="start">F1 • Inline fuse</text>
+        <text x="488" y="170" fill="#415267" font-size="11" font-weight="400" text-anchor="start">500 mA time-delay</text>
+        <circle cx="475" cy="170" r="5.5" fill="#d0d9df" stroke="#2c4051" stroke-width="1.2" />
+        <circle cx="613" cy="170" r="5.5" fill="#d0d9df" stroke="#2c4051" stroke-width="1.2" />
+      </g>
+      <g>
+        <rect x="681" y="112" width="194" height="99" fill="#dcebdc" stroke="#688295" rx="10" stroke-width="1.5" />
+        <text x="694" y="134" fill="#172637" font-size="15" font-weight="700" text-anchor="start">U2 • D24V5F5</text>
+        <text x="694" y="152" fill="#415267" font-size="11" font-weight="400" text-anchor="start">5 V buck · SHDN open</text>
+        <circle cx="704" cy="211" r="5.5" fill="#d0d9df" stroke="#2c4051" stroke-width="1.2" />
+        <text x="704" y="200" fill="#172637" font-size="11" font-weight="700" text-anchor="middle">VIN</text>
+        <circle cx="751" cy="211" r="5.5" fill="#d0d9df" stroke="#2c4051" stroke-width="1.2" />
+        <text x="751" y="200" fill="#172637" font-size="11" font-weight="700" text-anchor="middle">GND</text>
+        <circle cx="799" cy="211" r="5.5" fill="#d0d9df" stroke="#2c4051" stroke-width="1.2" />
+        <text x="799" y="200" fill="#172637" font-size="11" font-weight="700" text-anchor="middle">5V</text>
+        <circle cx="849" cy="211" r="5.5" fill="#d0d9df" stroke="#2c4051" stroke-width="1.2" />
+        <text x="849" y="200" fill="#172637" font-size="11" font-weight="700" text-anchor="middle">SHDN</text>
+      </g>
+      <g>
+        <rect x="944" y="130" width="131" height="59" fill="#eef4f8" stroke="#688295" rx="10" stroke-width="1.5" />
+        <text x="957" y="152" fill="#172637" font-size="15" font-weight="700" text-anchor="start">JP1 • Run shunt</text>
+        <circle cx="944" cy="169" r="5.5" fill="#d0d9df" stroke="#2c4051" stroke-width="1.2" />
+        <circle cx="1075" cy="169" r="5.5" fill="#d0d9df" stroke="#2c4051" stroke-width="1.2" />
+        <polyline points="949,169 1070,169" fill="none" stroke="#435567" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" />
+      </g>
+      <g id="xiao">
+        <rect x="258" y="422" width="190" height="181" fill="#29343e" stroke="#102334" rx="8" stroke-width="2" />
+        <rect x="245" y="480" width="27" height="58" fill="#b9c5cd" stroke="#536677" rx="4" stroke-width="2" />
+        <text x="351" y="469" fill="#fff" font-size="21" font-weight="700" text-anchor="middle">XIAO</text>
+        <text x="351" y="489" fill="#fff" font-size="14" font-weight="700" text-anchor="middle">nRF52840</text>
+        <rect x="319" y="501" width="63" height="44" fill="#1a252e" stroke="#7d909e" rx="5" />
+        <text x="351" y="528" fill="#d6e1e8" font-size="10" font-weight="400" text-anchor="middle">Seeed Studio</text>
+        <circle cx="270" cy="434" r="6" fill="#d9af52" stroke="#ad8543" />
+        <circle cx="270" cy="434" r="2.7" fill="#3c4650" stroke="none" />
+        <text x="270" y="453" fill="#fff" font-size="9" font-weight="700" text-anchor="middle">5V</text>
+        <circle cx="296" cy="434" r="6" fill="#d9af52" stroke="#ad8543" />
+        <circle cx="296" cy="434" r="2.7" fill="#3c4650" stroke="none" />
+        <text x="296" y="453" fill="#fff" font-size="9" font-weight="700" text-anchor="middle">GND</text>
+        <circle cx="322" cy="434" r="6" fill="#d9af52" stroke="#ad8543" />
+        <circle cx="322" cy="434" r="2.7" fill="#3c4650" stroke="none" />
+        <text x="322" y="453" fill="#fff" font-size="9" font-weight="700" text-anchor="middle">3V3</text>
+        <circle cx="348" cy="434" r="6" fill="#d9af52" stroke="#ad8543" />
+        <circle cx="348" cy="434" r="2.7" fill="#3c4650" stroke="none" />
+        <text x="348" y="453" fill="#fff" font-size="9" font-weight="700" text-anchor="middle">D10</text>
+        <circle cx="374" cy="434" r="6" fill="#d9af52" stroke="#ad8543" />
+        <circle cx="374" cy="434" r="2.7" fill="#3c4650" stroke="none" />
+        <text x="374" y="453" fill="#fff" font-size="9" font-weight="700" text-anchor="middle">D9</text>
+        <circle cx="400" cy="434" r="6" fill="#d9af52" stroke="#ad8543" />
+        <circle cx="400" cy="434" r="2.7" fill="#3c4650" stroke="none" />
+        <text x="400" y="453" fill="#fff" font-size="9" font-weight="700" text-anchor="middle">D8</text>
+        <circle cx="426" cy="434" r="6" fill="#d9af52" stroke="#ad8543" />
+        <circle cx="426" cy="434" r="2.7" fill="#3c4650" stroke="none" />
+        <text x="426" y="453" fill="#fff" font-size="9" font-weight="700" text-anchor="middle">D7</text>
+        <circle cx="270" cy="590" r="6" fill="#d9af52" stroke="#ad8543" />
+        <circle cx="270" cy="590" r="2.7" fill="#3c4650" stroke="none" />
+        <text x="270" y="577" fill="#fff" font-size="9" font-weight="700" text-anchor="middle">D0</text>
+        <circle cx="296" cy="590" r="6" fill="#d9af52" stroke="#ad8543" />
+        <circle cx="296" cy="590" r="2.7" fill="#3c4650" stroke="none" />
+        <text x="296" y="577" fill="#fff" font-size="9" font-weight="700" text-anchor="middle">D1</text>
+        <circle cx="322" cy="590" r="6" fill="#d9af52" stroke="#ad8543" />
+        <circle cx="322" cy="590" r="2.7" fill="#3c4650" stroke="none" />
+        <text x="322" y="577" fill="#fff" font-size="9" font-weight="700" text-anchor="middle">D2</text>
+        <circle cx="348" cy="590" r="6" fill="#d9af52" stroke="#ad8543" />
+        <circle cx="348" cy="590" r="2.7" fill="#3c4650" stroke="none" />
+        <text x="348" y="577" fill="#fff" font-size="9" font-weight="700" text-anchor="middle">D3</text>
+        <circle cx="374" cy="590" r="6" fill="#d9af52" stroke="#ad8543" />
+        <circle cx="374" cy="590" r="2.7" fill="#3c4650" stroke="none" />
+        <text x="374" y="577" fill="#fff" font-size="9" font-weight="700" text-anchor="middle">D4</text>
+        <circle cx="400" cy="590" r="6" fill="#d9af52" stroke="#ad8543" />
+        <circle cx="400" cy="590" r="2.7" fill="#3c4650" stroke="none" />
+        <text x="400" y="577" fill="#fff" font-size="9" font-weight="700" text-anchor="middle">D5</text>
+        <circle cx="426" cy="590" r="6" fill="#d9af52" stroke="#ad8543" />
+        <circle cx="426" cy="590" r="2.7" fill="#3c4650" stroke="none" />
+        <text x="426" y="577" fill="#fff" font-size="9" font-weight="700" text-anchor="middle">D6</text>
+      </g>
+      <g>
+        <polyline points="842,330 822,330" fill="none" stroke="#657680" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+        <polyline points="842,351 822,351" fill="none" stroke="#657680" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+        <rect x="803" y="322" width="37" height="37" fill="#40535f" stroke="#233743" rx="5" />
+        <rect x="827" y="322" width="13" height="37" fill="#9baab1" stroke="none" rx="3" />
+        <text x="808" y="345" fill="#fff" font-size="13" font-weight="700" text-anchor="start">+</text>
+      </g>
+      <g>
+        <polyline points="478,434 582,434" fill="none" stroke="#657680" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+        <rect x="513.0" y="428" width="34" height="12" fill="#e1c9a1" stroke="#907448" rx="4" />
+        <rect x="521.0" y="429" width="2.5" height="10" fill="#ce661b" stroke="none" rx="0" />
+        <rect x="527.0" y="429" width="2.5" height="10" fill="#ce661b" stroke="none" rx="0" />
+        <rect x="534.0" y="429" width="2.5" height="10" fill="#784226" stroke="none" rx="0" />
+        <rect x="542.0" y="429" width="2.5" height="10" fill="#b69943" stroke="none" rx="0" />
+        <rect x="492.0" y="414" width="76" height="12" fill="#f3f2ed" stroke="none" rx="2" />
+        <text x="530.0" y="424" fill="#172637" font-size="9" font-weight="700" text-anchor="middle">R3 · 330 Ω</text>
+      </g>
+      <g>
+        <polyline points="660,434 738,434" fill="none" stroke="#657680" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+        <rect x="682.0" y="428" width="34" height="12" fill="#e1c9a1" stroke="#907448" rx="4" />
+        <rect x="690.0" y="429" width="2.5" height="10" fill="#ce661b" stroke="none" rx="0" />
+        <rect x="696.0" y="429" width="2.5" height="10" fill="#ce661b" stroke="none" rx="0" />
+        <rect x="703.0" y="429" width="2.5" height="10" fill="#784226" stroke="none" rx="0" />
+        <rect x="711.0" y="429" width="2.5" height="10" fill="#b69943" stroke="none" rx="0" />
+        <rect x="661.0" y="414" width="76" height="12" fill="#f3f2ed" stroke="none" rx="2" />
+        <text x="699.0" y="424" fill="#172637" font-size="9" font-weight="700" text-anchor="middle">R4 · 330 Ω</text>
+      </g>
+      <g>
+        <polyline points="530,408 582,408" fill="none" stroke="#657680" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+        <rect x="539.0" y="402" width="34" height="12" fill="#e1c9a1" stroke="#907448" rx="4" />
+        <rect x="547.0" y="403" width="2.5" height="10" fill="#784226" stroke="none" rx="0" />
+        <rect x="553.0" y="403" width="2.5" height="10" fill="#292929" stroke="none" rx="0" />
+        <rect x="560.0" y="403" width="2.5" height="10" fill="#e1b625" stroke="none" rx="0" />
+        <rect x="568.0" y="403" width="2.5" height="10" fill="#b69943" stroke="none" rx="0" />
+        <rect x="518.0" y="388" width="76" height="12" fill="#f3f2ed" stroke="none" rx="2" />
+        <text x="556.0" y="398" fill="#172637" font-size="9" font-weight="700" text-anchor="middle">R1 · 100 kΩ</text>
+      </g>
+      <g>
+        <polyline points="686,408 738,408" fill="none" stroke="#657680" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+        <rect x="695.0" y="402" width="34" height="12" fill="#e1c9a1" stroke="#907448" rx="4" />
+        <rect x="703.0" y="403" width="2.5" height="10" fill="#784226" stroke="none" rx="0" />
+        <rect x="709.0" y="403" width="2.5" height="10" fill="#292929" stroke="none" rx="0" />
+        <rect x="716.0" y="403" width="2.5" height="10" fill="#e1b625" stroke="none" rx="0" />
+        <rect x="724.0" y="403" width="2.5" height="10" fill="#b69943" stroke="none" rx="0" />
+        <rect x="674.0" y="388" width="76" height="12" fill="#f3f2ed" stroke="none" rx="2" />
+        <text x="712.0" y="398" fill="#172637" font-size="9" font-weight="700" text-anchor="middle">R2 · 100 kΩ</text>
+      </g>
+      <g>
+        <polyline points="530,616 712,616" fill="none" stroke="#657680" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+        <rect x="604.0" y="610" width="34" height="12" fill="#e1c9a1" stroke="#907448" rx="4" />
+        <rect x="612.0" y="611" width="2.5" height="10" fill="#236196" stroke="none" rx="0" />
+        <rect x="618.0" y="611" width="2.5" height="10" fill="#81868a" stroke="none" rx="0" />
+        <rect x="625.0" y="611" width="2.5" height="10" fill="#784226" stroke="none" rx="0" />
+        <rect x="633.0" y="611" width="2.5" height="10" fill="#b69943" stroke="none" rx="0" />
+        <rect x="583.0" y="596" width="76" height="12" fill="#f3f2ed" stroke="none" rx="2" />
+        <text x="621.0" y="606" fill="#172637" font-size="9" font-weight="700" text-anchor="middle">R5 · 680 Ω</text>
+      </g>
+      <g>
+        <rect x="576" y="442" width="64" height="30" fill="#303d49" stroke="#182635" rx="4" />
+        <polyline points="582,471 582,486" fill="none" stroke="#657680" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" />
+        <text x="582" y="467" fill="#fff" font-size="9" font-weight="700" text-anchor="middle">G</text>
+        <polyline points="608,471 608,486" fill="none" stroke="#657680" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" />
+        <text x="608" y="467" fill="#fff" font-size="9" font-weight="700" text-anchor="middle">D</text>
+        <polyline points="634,471 634,486" fill="none" stroke="#657680" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" />
+        <text x="634" y="467" fill="#fff" font-size="9" font-weight="700" text-anchor="middle">S</text>
+        <text x="608" y="455" fill="#fff" font-size="12" font-weight="700" text-anchor="middle">Q1</text>
+        <text x="604" y="508" fill="#415267" font-size="10" font-weight="700" text-anchor="end">IRLZ44NPBF</text>
+        <text x="604" y="520" fill="#415267" font-size="9" font-weight="400" text-anchor="end">Tab = D</text>
+      </g>
+      <g>
+        <rect x="732" y="442" width="64" height="30" fill="#303d49" stroke="#182635" rx="4" />
+        <polyline points="738,471 738,486" fill="none" stroke="#657680" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" />
+        <text x="738" y="467" fill="#fff" font-size="9" font-weight="700" text-anchor="middle">G</text>
+        <polyline points="764,471 764,486" fill="none" stroke="#657680" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" />
+        <text x="764" y="467" fill="#fff" font-size="9" font-weight="700" text-anchor="middle">D</text>
+        <polyline points="790,471 790,486" fill="none" stroke="#657680" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" />
+        <text x="790" y="467" fill="#fff" font-size="9" font-weight="700" text-anchor="middle">S</text>
+        <text x="764" y="455" fill="#fff" font-size="12" font-weight="700" text-anchor="middle">Q2</text>
+        <text x="760" y="508" fill="#415267" font-size="10" font-weight="700" text-anchor="end">IRLZ44NPBF</text>
+        <text x="760" y="520" fill="#415267" font-size="9" font-weight="400" text-anchor="end">Tab = D</text>
+      </g>
+      <g>
+        <polyline points="712,642 712,625" fill="none" stroke="#667780" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+        <text x="712" y="657" fill="#415267" font-size="9" font-weight="700" text-anchor="middle">A</text>
+        <polyline points="738,642 738,625" fill="none" stroke="#667780" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+        <text x="738" y="657" fill="#415267" font-size="9" font-weight="700" text-anchor="middle">K</text>
+        <rect x="715" y="613" width="48" height="21" fill="#b32f41" stroke="#841b2e" rx="8" />
+        <circle cx="725" cy="621" r="3" fill="#ef9295" stroke="none" />
+      </g>
+      <g>
+        <rect x="130" y="825" width="254" height="84" fill="#f0f3f5" stroke="#688295" rx="10" stroke-width="1.5" />
+        <text x="143" y="847" fill="#172637" font-size="15" font-weight="700" text-anchor="start">SW1 • Single photo</text>
+        <circle cx="348" cy="876" r="19" fill="#29373e" stroke="none" />
+        <circle cx="348" cy="876" r="15" fill="#537ba2" stroke="#25364a" />
+        <circle cx="343" cy="870" r="4" fill="#fff" stroke="none" opacity=".3" />
+        <circle cx="160" cy="825" r="5.5" fill="#ccd5d9" stroke="#2f4356" stroke-width="1.2" />
+        <text x="160" y="867" fill="#172637" font-size="11" font-weight="700" text-anchor="middle">NO</text>
+        <circle cx="212" cy="825" r="5.5" fill="#ccd5d9" stroke="#2f4356" stroke-width="1.2" />
+        <text x="212" y="867" fill="#172637" font-size="11" font-weight="700" text-anchor="middle">COM</text>
+        <circle cx="267" cy="825" r="5.5" fill="#ccd5d9" stroke="#2f4356" stroke-width="1.2" />
+        <text x="267" y="867" fill="#172637" font-size="11" font-weight="700" text-anchor="middle">LED+</text>
+        <circle cx="311" cy="825" r="5.5" fill="#ccd5d9" stroke="#2f4356" stroke-width="1.2" />
+        <text x="311" y="867" fill="#172637" font-size="11" font-weight="700" text-anchor="middle">LED−</text>
+        <text x="146" y="892" fill="#415267" font-size="11" font-weight="400" text-anchor="start">12 V current-limited lamp</text>
+      </g>
+      <g>
+        <rect x="698" y="825" width="254" height="84" fill="#f0f3f5" stroke="#688295" rx="10" stroke-width="1.5" />
+        <text x="711" y="847" fill="#172637" font-size="15" font-weight="700" text-anchor="start">SW2 • Four-shot sequence</text>
+        <circle cx="916" cy="876" r="19" fill="#29373e" stroke="none" />
+        <circle cx="916" cy="876" r="15" fill="#967449" stroke="#25364a" />
+        <circle cx="911" cy="870" r="4" fill="#fff" stroke="none" opacity=".3" />
+        <circle cx="728" cy="825" r="5.5" fill="#ccd5d9" stroke="#2f4356" stroke-width="1.2" />
+        <text x="728" y="867" fill="#172637" font-size="11" font-weight="700" text-anchor="middle">NO</text>
+        <circle cx="780" cy="825" r="5.5" fill="#ccd5d9" stroke="#2f4356" stroke-width="1.2" />
+        <text x="780" y="867" fill="#172637" font-size="11" font-weight="700" text-anchor="middle">COM</text>
+        <circle cx="835" cy="825" r="5.5" fill="#ccd5d9" stroke="#2f4356" stroke-width="1.2" />
+        <text x="835" y="867" fill="#172637" font-size="11" font-weight="700" text-anchor="middle">LED+</text>
+        <circle cx="879" cy="825" r="5.5" fill="#ccd5d9" stroke="#2f4356" stroke-width="1.2" />
+        <text x="879" y="867" fill="#172637" font-size="11" font-weight="700" text-anchor="middle">LED−</text>
+        <text x="714" y="892" fill="#415267" font-size="11" font-weight="400" text-anchor="start">12 V current-limited lamp</text>
+      </g>
+    </g>
+    <text x="220" y="156" fill="#415267" font-size="10" font-weight="700" text-anchor="middle">USB-C</text>
+    <text x="1009" y="207" fill="#415267" font-size="10" font-weight="400" text-anchor="middle">Remove for USB programming</text>
+    <text x="795" y="313" fill="#415267" font-size="11" font-weight="700" text-anchor="start">C1 · 47 µF</text>
+    <text x="765" y="629" fill="#415267" font-size="11" font-weight="700" text-anchor="start">LED3 · Status</text>
+  </g>
+</svg>

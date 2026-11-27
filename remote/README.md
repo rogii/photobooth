@@ -19,39 +19,11 @@ The remote pairs with the photobooth's Raspberry Pi as a Bluetooth Low Energy (B
 | F1 | Inline DC fuse for the 12 V wiring. A 500 mA time-delay fuse is a starting point for two small button lamps and the XIAO. Confirm it against measured running and startup current and the wire rating. |
 | SW3, JP1 | SPST toggle switch for the PD board's `OFF` pads and a removable two-pin jumper for the XIAO's 5 V feed. |
 
-## Schematic
+## Breadboard wiring
 
-```text
-Power
-  Power bank USB-C PD OUT === USB-C cable === U1 USB-C IN
-  U1 OUT+ ---- F1 ----+---------------------- +12V_LED
-                      +---------------------- U2 VIN
-                      +---- C1 (+ to -) ----- GND
-  U1 OUT- ----------------------------------- GND
-  U1 OFF pad ---- SW3 ----------------------- U1 other OFF pad
-  U2 GND ------------------------------------ GND
-  U2 SHDN ----------------------------------- open
-  U2 VOUT (5 V) ---- JP1 -------------------- XIAO 5V
-  XIAO GND ---------------------------------- GND
+![Top-down breadboard layout for the USB-C-powered Photobooth remote](photobooth-remote-breadboard.svg)
 
-Button contacts
-  XIAO D1 (P0.03) ---- SW1 (NO) -------------- GND    Single photo
-  XIAO D2 (P0.28) ---- SW2 (NO) -------------- GND    Four-shot sequence
-
-Button LED circuits
-  +12V_LED ---- LED1 (+ to -) --------------- Q1 D (2, tab)
-  XIAO D3 (P0.29) ---- R3 330 Ω ----+-------- Q1 G (1)
-                                    +-------- R1 100 kΩ ---- GND
-  GND --------------------------------------- Q1 S (3)
-
-  +12V_LED ---- LED2 (+ to -) --------------- Q2 D (2, tab)
-  XIAO D4 (P0.04) ---- R4 330 Ω ----+-------- Q2 G (1)
-                                    +-------- R2 100 kΩ ---- GND
-  GND --------------------------------------- Q2 S (3)
-
-Status LED
-  XIAO D5 (P0.05) ---- R5 680 Ω ---- LED3 (+ to -) ---- GND
-```
+The layout uses a 30-column solderless breadboard with a separate +12 V upper rail and +5 V lower rail. The two ground rails are joined. If your board has split rails, check their continuity and bridge any splits crossed by the wiring. The power modules and arcade buttons are mounted off-board and shown with labeled terminals. For electrical reference, see the [schematic](photobooth-remote-schematic.svg) or open the [Fritzing project](photobooth-remote.fzz) in **Schematic** view.
 
 Connect the PD board, buck regulator, XIAO and both MOSFET sources to the same ground. Feed regulated 5 V into the XIAO's `5V` pin. Its onboard regulator supplies 3.3 V to the nRF52840. Leave the XIAO's `3V3`, `BAT+`, and `BAT−` power connections unused. The 12 V rail feeds the LED anodes and the buck input. [Seeed board schematic](https://files.seeedstudio.com/wiki/XIAO-BLE/Seeed_Studio_XIAO_nRF52840_PDF.pdf)
 
